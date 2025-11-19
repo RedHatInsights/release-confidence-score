@@ -1,0 +1,37 @@
+services:
+  release-confidence-score:
+    build: .
+    env_file: .env
+    environment:
+      # GitHub Configuration
+      - GITHUB_TOKEN
+      # GitLab Configuration
+      - GITLAB_BASE_URL
+      - GITLAB_SKIP_SSL_VERIFY
+      - GITLAB_TOKEN
+      # Model Selection
+      - MODEL_PROVIDER
+      - MODEL_SKIP_SSL_VERIFY
+      # Claude Configuration
+      - CLAUDE_MODEL_API
+      - CLAUDE_MODEL_ID
+      - CLAUDE_USER_KEY
+      # Gemini Configuration
+      - GEMINI_MODEL_API
+      - GEMINI_MODEL_ID
+      - GEMINI_USER_KEY
+      # Llama Configuration
+      - LLAMA_MODEL_API
+      - LLAMA_MODEL_ID
+      - LLAMA_USER_KEY
+      # Token and Performance
+      - MAX_RESPONSE_TOKENS
+      - TIMEOUT_SECONDS
+      # Scoring Thresholds
+      - SCORE_THRESHOLD_AUTO_DEPLOY
+      - SCORE_THRESHOLD_REVIEW_REQUIRED
+      # Logging Configuration
+      - LOG_LEVEL
+      - LOG_FORMAT
+      # System Prompt Version
+      - SYSTEM_PROMPT_VERSION
