@@ -21,6 +21,9 @@ RUN strip release-confidence-score
 # Runtime stage
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
+# Konflux preflight check requires a license
+COPY --from=build /opt/app-root/src/LICENSE /licenses/LICENSE
+
 WORKDIR /app
 RUN chmod +x /app
 
