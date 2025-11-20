@@ -15,7 +15,7 @@ import (
 	"release-confidence-score/internal/report"
 	"release-confidence-score/internal/shared"
 
-	githubapi "github.com/google/go-github/v76/github"
+	githubapi "github.com/google/go-github/v79/github"
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
 
