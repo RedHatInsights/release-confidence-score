@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v76/github"
+	"github.com/google/go-github/v79/github"
 )
 
 // FormatComparisonForLLM converts GitHub comparison data to LLM-friendly format

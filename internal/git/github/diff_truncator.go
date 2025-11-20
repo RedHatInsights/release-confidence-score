@@ -6,7 +6,7 @@ import (
 
 	"release-confidence-score/internal/shared"
 
-	"github.com/google/go-github/v76/github"
+	"github.com/google/go-github/v79/github"
 )
 
 // FileRiskLevel represents the risk level of a file for prioritization during truncation

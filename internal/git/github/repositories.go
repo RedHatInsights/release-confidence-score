@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/go-github/v76/github"
+	"github.com/google/go-github/v79/github"
 )
 
 // FetchFileContent gets file content from GitHub API using SDK

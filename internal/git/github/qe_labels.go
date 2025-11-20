@@ -1,7 +1,7 @@
 package github
 
 import (
-	"github.com/google/go-github/v76/github"
+	"github.com/google/go-github/v79/github"
 )
 
 // GetPRQELabel extracts the QE testing label from a PR object
