@@ -27,7 +27,7 @@ const (
 var urlRegex = regexp.MustCompile(`(?m)^- (https?://\S+)$`)
 
 // GetDiffURLsAndUserGuidance fetches merge request notes and extracts diff URLs and user guidance
-func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, mergeRequestIID int) ([]string, []shared.UserGuidance, error) {
+func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, cfg *config.Config, mergeRequestIID int) ([]string, []shared.UserGuidance, error) {
 	notes, err := getAllMergeRequestNotes(client, mergeRequestIID)
 	if err != nil {
 		return nil, nil, err
@@ -38,7 +38,7 @@ func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, mergeRequestIID int) (
 		return nil, nil, err
 	}
 
-	userGuidance := extractUserGuidance(mergeRequestIID, notes)
+	userGuidance := extractUserGuidance(cfg, mergeRequestIID, notes)
 
 	return diffURLs, userGuidance, nil
 }
@@ -99,11 +99,10 @@ func extractDiffURLsFromBot(notes []*gitlabapi.Note) ([]string, error) {
 }
 
 // extractUserGuidance extracts user guidance from merge request notes with full metadata
-func extractUserGuidance(mergeRequestIID int, notes []*gitlabapi.Note) []shared.UserGuidance {
+func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitlabapi.Note) []shared.UserGuidance {
 	var allGuidance []shared.UserGuidance
 
 	// Build the merge request URL from config
-	cfg := config.Get()
 	mrURL := fmt.Sprintf("%s/%s/-/merge_requests/%d", cfg.GitLabBaseURL, projectID, mergeRequestIID)
 
 	for _, note := range notes {

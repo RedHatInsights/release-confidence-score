@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"release-confidence-score/internal/changelog"
+	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/github"
 	"release-confidence-score/internal/shared"
 
@@ -12,7 +13,7 @@ import (
 
 // GetReleaseData fetches raw release data from multiple GitHub compare URLs
 // Returns: changelogs, GitHub user guidance, documentation, comparisons, error
-func GetReleaseData(githubClient *githubapi.Client, urls []string) ([]*changelog.Changelog, []shared.UserGuidance, []*github.RepoDocumentation, []*github.CompareData, error) {
+func GetReleaseData(githubClient *githubapi.Client, cfg *config.Config, urls []string) ([]*changelog.Changelog, []shared.UserGuidance, []*github.RepoDocumentation, []*github.CompareData, error) {
 	if len(urls) == 0 {
 		return []*changelog.Changelog{}, []shared.UserGuidance{}, []*github.RepoDocumentation{}, []*github.CompareData{}, nil
 	}
@@ -31,7 +32,7 @@ func GetReleaseData(githubClient *githubapi.Client, urls []string) ([]*changelog
 
 		slog.Debug("Fetching GitHub data", "url", url)
 		// Fetch raw comparison data, changelog, user guidance, and documentation
-		_, changelog, userGuidance, docs, compareData, err := github.FetchCompareDataWithMeta(githubClient, url)
+		_, changelog, userGuidance, docs, compareData, err := github.FetchCompareDataWithMeta(githubClient, cfg, url)
 		if err != nil {
 			slog.Error("❌ Error fetching GitHub data", "error", err, "url", url)
 			continue

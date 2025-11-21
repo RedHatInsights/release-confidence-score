@@ -42,6 +42,7 @@ var (
 
 type DocumentationFetcher struct {
 	client *github.Client
+	config *config.Config
 }
 
 type RepoDocumentation struct {
@@ -54,8 +55,11 @@ type RepoDocumentation struct {
 	DefaultBranch   string            // Default branch name (e.g., "main", "master")
 }
 
-func NewDocumentationFetcher(client *github.Client) *DocumentationFetcher {
-	return &DocumentationFetcher{client: client}
+func NewDocumentationFetcher(client *github.Client, cfg *config.Config) *DocumentationFetcher {
+	return &DocumentationFetcher{
+		client: client,
+		config: cfg,
+	}
 }
 
 // FetchCompleteDocsParsed fetches entry point documentation and all linked docs
@@ -264,9 +268,8 @@ func (d *DocumentationFetcher) fetchExternalURL(ctx context.Context, url string)
 	}
 
 	// Configure GitLab-specific settings if needed
-	cfg := config.Get()
-	client := createHTTPClient(rawURL, cfg)
-	configureGitLabRequest(req, rawURL, cfg)
+	client := createHTTPClient(rawURL, d.config)
+	configureGitLabRequest(req, rawURL, d.config)
 
 	// Execute request
 	resp, err := client.Do(req)

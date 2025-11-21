@@ -7,11 +7,17 @@ import (
 	"strconv"
 
 	"release-confidence-score/internal"
+	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/logger"
 )
 
 func main() {
-	logger.Setup()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatalf("Failed to load configuration: %v", err)
+	}
+
+	logger.Setup(cfg)
 
 	if len(os.Args) < 2 {
 		log.Fatal("Usage: go run main.go <merge-request-iid>")
@@ -22,7 +28,7 @@ func main() {
 		log.Fatalf("Invalid merge request IID '%s': %v", os.Args[1], err)
 	}
 
-	releaseAnalyzer, err := internal.New()
+	releaseAnalyzer, err := internal.New(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create release analyzer: %v", err)
 	}

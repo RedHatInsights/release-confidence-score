@@ -8,18 +8,16 @@ import (
 )
 
 // NewClient creates the appropriate LLM client based on configuration
-func NewClient() (llm.LLMClient, error) {
-	cfg := config.Get()
-
+func NewClient(cfg *config.Config) (llm.LLMClient, error) {
 	switch cfg.ModelProvider {
 	case "claude":
-		return NewClaude(), nil
+		return NewClaude(cfg), nil
 
 	case "gemini":
-		return NewGemini(), nil
+		return NewGemini(cfg), nil
 
 	case "llama":
-		return NewLlama(), nil
+		return NewLlama(cfg), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported model provider: %s", cfg.ModelProvider)

@@ -17,7 +17,9 @@ import (
 	"release-confidence-score/internal/shared"
 )
 
-type LlamaClient struct{}
+type LlamaClient struct {
+	config *config.Config
+}
 
 type LlamaRequest struct {
 	MaxTokens   int     `json:"max_tokens"`
@@ -41,15 +43,15 @@ type LlamaUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-func NewLlama() llm.LLMClient {
-	return &LlamaClient{}
+func NewLlama(cfg *config.Config) llm.LLMClient {
+	return &LlamaClient{config: cfg}
 }
 
 func (l *LlamaClient) Analyze(userPrompt string) (string, error) {
-	cfg := config.Get()
+	cfg := l.config
 
 	// Llama uses combined prompt
-	combinedPrompt := system.GetSystemPrompt() + "\n\n" + userPrompt
+	combinedPrompt := system.GetSystemPrompt(cfg) + "\n\n" + userPrompt
 
 	req := LlamaRequest{
 		Model:       cfg.ModelID,

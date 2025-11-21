@@ -13,9 +13,9 @@ var systemPromptV1 string
 //go:embed system_prompt_v2.md
 var systemPromptV2 string
 
-// getSystemPrompt returns the appropriate system prompt based on the config's SystemPromptVersion
-func GetSystemPrompt() string {
-	version := config.Get().SystemPromptVersion
+// GetSystemPrompt returns the appropriate system prompt based on the config's SystemPromptVersion
+func GetSystemPrompt(cfg *config.Config) string {
+	version := cfg.SystemPromptVersion
 
 	switch version {
 	case "v1":

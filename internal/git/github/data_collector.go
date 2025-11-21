@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"release-confidence-score/internal/changelog"
+	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/shared"
 
 	"github.com/google/go-github/v79/github"
@@ -21,7 +22,7 @@ type CompareData struct {
 
 // FetchCompareDataWithMeta fetches GitHub compare data with PR analysis for user guidance and labels
 // Returns: formatted diff, changelog, user guidance, documentation, compare data, error
-func FetchCompareDataWithMeta(client *github.Client, compareURL string) (string, *changelog.Changelog, []shared.UserGuidance, *RepoDocumentation, *CompareData, error) {
+func FetchCompareDataWithMeta(client *github.Client, cfg *config.Config, compareURL string) (string, *changelog.Changelog, []shared.UserGuidance, *RepoDocumentation, *CompareData, error) {
 	// Parse compare URL once
 	owner, repo, baseCommit, headCommit, err := parseCompareURL(compareURL)
 	if err != nil {
@@ -46,7 +47,7 @@ func FetchCompareDataWithMeta(client *github.Client, compareURL string) (string,
 		"content_length", len(formattedDiff))
 
 	// Try to fetch repository documentation
-	docsFetcher := NewDocumentationFetcher(client)
+	docsFetcher := NewDocumentationFetcher(client, cfg)
 	docs, err := docsFetcher.FetchCompleteDocsParsed(context.Background(), owner, repo)
 	var documentation *RepoDocumentation
 	if err == nil {

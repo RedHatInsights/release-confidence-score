@@ -23,14 +23,15 @@ type ReleaseAnalyzer struct {
 	githubClient *githubapi.Client
 	gitlabClient *gitlabapi.Client
 	llmClient    llm.LLMClient
+	config       *config.Config
 }
 
-func New() (*ReleaseAnalyzer, error) {
+func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 
-	githubClient := github.NewClient()
-	gitlabClient := gitlab.NewClient()
+	githubClient := github.NewClient(cfg)
+	gitlabClient := gitlab.NewClient(cfg)
 
-	llmClient, err := providers.NewClient()
+	llmClient, err := providers.NewClient(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM client: %w", err)
 	}
@@ -39,6 +40,7 @@ func New() (*ReleaseAnalyzer, error) {
 		githubClient: githubClient,
 		gitlabClient: gitlabClient,
 		llmClient:    llmClient,
+		config:       cfg,
 	}, nil
 }
 
@@ -47,13 +49,13 @@ func (ra *ReleaseAnalyzer) Analyze(mergeRequestIID int) (float64, string, error)
 
 	// Phase 1: Fetch all data
 	// Get diff URLs and user guidance from merge request notes
-	diffURLs, appInterfaceGuidance, err := app_interface.GetDiffURLsAndUserGuidance(ra.gitlabClient, mergeRequestIID)
+	diffURLs, appInterfaceGuidance, err := app_interface.GetDiffURLsAndUserGuidance(ra.gitlabClient, ra.config, mergeRequestIID)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to get release data from app-interface: %w", err)
 	}
 
 	// Fetch raw release data from GitHub
-	changelogs, githubGuidance, documentation, comparisons, err := GetReleaseData(ra.githubClient, diffURLs)
+	changelogs, githubGuidance, documentation, comparisons, err := GetReleaseData(ra.githubClient, ra.config, diffURLs)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to fetch release data: %w", err)
 	}
@@ -82,15 +84,14 @@ func (ra *ReleaseAnalyzer) Analyze(mergeRequestIID int) (float64, string, error)
 	}
 
 	// Build metadata for template processing
-	cfg := config.Get()
 	reportMetadata := &report.ReportMetadata{
-		ModelID:        cfg.ModelID,
+		ModelID:        ra.config.ModelID,
 		GenerationTime: time.Now(),
 	}
 
 	// Process the analysis into final report using embedded template
 	finalReport, err := report.ProcessAnalysis(analysis, reportMetadata, changelogs, documentation, allUserGuidance,
-		truncationInfo, cfg.ScoreThresholds.AutoDeploy, cfg.ScoreThresholds.ReviewRequired)
+		truncationInfo, ra.config.ScoreThresholds.AutoDeploy, ra.config.ScoreThresholds.ReviewRequired)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to process analysis into report: %w", err)
 	}

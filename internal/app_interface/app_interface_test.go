@@ -168,8 +168,10 @@ func TestExtractUserGuidance(t *testing.T) {
 	t.Setenv("CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("CLAUDE_MODEL_ID", "test-model")
 	t.Setenv("CLAUDE_USER_KEY", "test-key")
-	config.Reset()
-	cfg := config.Get()
+	cfg, err := config.Load()
+	if err != nil {
+		t.Fatalf("Failed to load config: %v", err)
+	}
 
 	mergeRequestIID := 123
 	createdAt := time.Now()
@@ -331,7 +333,7 @@ func TestExtractUserGuidance(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			guidance := extractUserGuidance(mergeRequestIID, tt.notes)
+			guidance := extractUserGuidance(cfg, mergeRequestIID, tt.notes)
 
 			if len(guidance) != len(tt.expected) {
 				t.Errorf("Expected %d guidance items, got %d", len(tt.expected), len(guidance))

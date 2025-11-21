@@ -14,8 +14,7 @@ const (
 )
 
 // Setup initializes and configures the application logger
-func Setup() *slog.Logger {
-	cfg := config.Get()
+func Setup(cfg *config.Config) *slog.Logger {
 	level := parseLogLevel(cfg.LogLevel)
 
 	var handler slog.Handler

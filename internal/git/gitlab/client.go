@@ -8,8 +8,7 @@ import (
 	"release-confidence-score/internal/shared"
 )
 
-func NewClient() *gitlab.Client {
-	cfg := config.Get()
+func NewClient(cfg *config.Config) *gitlab.Client {
 	var client *gitlab.Client
 	var err error
 
