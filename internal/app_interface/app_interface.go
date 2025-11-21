@@ -9,7 +9,7 @@ import (
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/shared"
 
-	gitlab "gitlab.com/gitlab-org/api/client-go"
+	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
 
 const (
@@ -27,7 +27,7 @@ const (
 var urlRegex = regexp.MustCompile(`(?m)^- (https?://\S+)$`)
 
 // GetDiffURLsAndUserGuidance fetches merge request notes and extracts diff URLs and user guidance
-func GetDiffURLsAndUserGuidance(client *gitlab.Client, mergeRequestIID int) ([]string, []shared.UserGuidance, error) {
+func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, mergeRequestIID int) ([]string, []shared.UserGuidance, error) {
 	notes, err := getAllMergeRequestNotes(client, mergeRequestIID)
 	if err != nil {
 		return nil, nil, err
@@ -44,18 +44,18 @@ func GetDiffURLsAndUserGuidance(client *gitlab.Client, mergeRequestIID int) ([]s
 }
 
 // getAllMergeRequestNotes fetches all notes for a merge request with automatic pagination
-func getAllMergeRequestNotes(client *gitlab.Client, mergeRequestIID int) ([]*gitlab.Note, error) {
+func getAllMergeRequestNotes(client *gitlabapi.Client, mergeRequestIID int) ([]*gitlabapi.Note, error) {
 	orderBy := "created_at"
 	sort := "desc"
-	opts := &gitlab.ListMergeRequestNotesOptions{
+	opts := &gitlabapi.ListMergeRequestNotesOptions{
 		// Use maximum PerPage value of 100 to minimize API calls
 		// See: https://docs.gitlab.com/api/rest/#pagination
-		ListOptions: gitlab.ListOptions{PerPage: 100},
+		ListOptions: gitlabapi.ListOptions{PerPage: 100},
 		OrderBy:     &orderBy,
 		Sort:        &sort,
 	}
 
-	var notes []*gitlab.Note
+	var notes []*gitlabapi.Note
 	for {
 		pageNotes, resp, err := client.Notes.ListMergeRequestNotes(projectID, mergeRequestIID, opts)
 		if err != nil {
@@ -74,7 +74,7 @@ func getAllMergeRequestNotes(client *gitlab.Client, mergeRequestIID int) ([]*git
 }
 
 // extractDiffURLsFromBot finds the devtools-bot comment and extracts diff URLs
-func extractDiffURLsFromBot(notes []*gitlab.Note) ([]string, error) {
+func extractDiffURLsFromBot(notes []*gitlabapi.Note) ([]string, error) {
 	for _, note := range notes {
 		if note.Author.Username != botUsername || !strings.HasPrefix(note.Body, diffsMarker) {
 			continue
@@ -99,8 +99,7 @@ func extractDiffURLsFromBot(notes []*gitlab.Note) ([]string, error) {
 }
 
 // extractUserGuidance extracts user guidance from merge request notes with full metadata
-// All GitLab guidance is considered authorized since it comes from a private repository
-func extractUserGuidance(mergeRequestIID int, notes []*gitlab.Note) []shared.UserGuidance {
+func extractUserGuidance(mergeRequestIID int, notes []*gitlabapi.Note) []shared.UserGuidance {
 	var allGuidance []shared.UserGuidance
 
 	// Build the merge request URL from config
