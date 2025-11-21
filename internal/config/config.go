@@ -60,8 +60,8 @@ func Reset() {
 
 func load() (*Config, error) {
 	// Parse max response tokens with default
-	maxResponseTokens := 1000 // Default for LLM response length
-	if maxResponseTokensStr := os.Getenv("MAX_RESPONSE_TOKENS"); maxResponseTokensStr != "" {
+	maxResponseTokens := 2000 // Default for LLM response length
+	if maxResponseTokensStr := os.Getenv("MODEL_MAX_RESPONSE_TOKENS"); maxResponseTokensStr != "" {
 		if parsed, err := strconv.Atoi(maxResponseTokensStr); err == nil && parsed > 0 {
 			maxResponseTokens = parsed
 		}
@@ -69,7 +69,7 @@ func load() (*Config, error) {
 
 	// Parse timeout with default
 	timeoutSeconds := 120 // Default 2 minute timeout
-	if timeoutStr := os.Getenv("TIMEOUT_SECONDS"); timeoutStr != "" {
+	if timeoutStr := os.Getenv("MODEL_TIMEOUT_SECONDS"); timeoutStr != "" {
 		if parsed, err := strconv.Atoi(timeoutStr); err == nil && parsed > 0 {
 			timeoutSeconds = parsed
 		}

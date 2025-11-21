@@ -3,35 +3,35 @@ services:
     build: .
     env_file: .env
     environment:
-      # GitHub Configuration
+      # GitHub configuration
       - GITHUB_TOKEN
-      # GitLab Configuration
+      # GitLab configuration
       - GITLAB_BASE_URL
       - GITLAB_SKIP_SSL_VERIFY
       - GITLAB_TOKEN
-      # Model Selection
+      # Logging configuration
+      - LOG_FORMAT
+      - LOG_LEVEL
+      # Model selection (claude, gemini or llama)
       - MODEL_PROVIDER
-      - MODEL_SKIP_SSL_VERIFY
-      # Claude Configuration
+      # Claude configuration
       - CLAUDE_MODEL_API
       - CLAUDE_MODEL_ID
       - CLAUDE_USER_KEY
-      # Gemini Configuration
+      # Gemini configuration
       - GEMINI_MODEL_API
       - GEMINI_MODEL_ID
       - GEMINI_USER_KEY
-      # Llama Configuration
+      # Llama configuration
       - LLAMA_MODEL_API
       - LLAMA_MODEL_ID
       - LLAMA_USER_KEY
-      # Token and Performance
-      - MAX_RESPONSE_TOKENS
-      - TIMEOUT_SECONDS
-      # Scoring Thresholds
+      # Additional model configuration
+      - MODEL_MAX_RESPONSE_TOKENS
+      - MODEL_SKIP_SSL_VERIFY
+      - MODEL_TIMEOUT_SECONDS
+      # System prompt version
+      - SYSTEM_PROMPT_VERSION
+      # Scoring thresholds
       - SCORE_THRESHOLD_AUTO_DEPLOY
       - SCORE_THRESHOLD_REVIEW_REQUIRED
-      # Logging Configuration
-      - LOG_LEVEL
-      - LOG_FORMAT
-      # System Prompt Version
-      - SYSTEM_PROMPT_VERSION
