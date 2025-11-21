@@ -17,7 +17,9 @@ import (
 	"release-confidence-score/internal/shared"
 )
 
-type GeminiClient struct{}
+type GeminiClient struct {
+	config *config.Config
+}
 
 type GeminiRequest struct {
 	MaxTokens   int             `json:"max_tokens"`
@@ -46,15 +48,15 @@ type GeminiUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-func NewGemini() llm.LLMClient {
-	return &GeminiClient{}
+func NewGemini(cfg *config.Config) llm.LLMClient {
+	return &GeminiClient{config: cfg}
 }
 
 func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
-	cfg := config.Get()
+	cfg := g.config
 
 	// Gemini uses combined prompt
-	combinedPrompt := system.GetSystemPrompt() + "\n\n" + userPrompt
+	combinedPrompt := system.GetSystemPrompt(cfg) + "\n\n" + userPrompt
 
 	req := GeminiRequest{
 		Model: cfg.ModelID,

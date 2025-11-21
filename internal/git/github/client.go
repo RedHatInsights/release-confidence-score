@@ -7,7 +7,6 @@ import (
 	"release-confidence-score/internal/config"
 )
 
-func NewClient() *github.Client {
-	cfg := config.Get()
+func NewClient(cfg *config.Config) *github.Client {
 	return github.NewTokenClient(context.Background(), cfg.GitHubToken)
 }

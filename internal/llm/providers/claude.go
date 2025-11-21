@@ -18,7 +18,9 @@ import (
 	"release-confidence-score/internal/shared"
 )
 
-type ClaudeClient struct{}
+type ClaudeClient struct {
+	config *config.Config
+}
 
 type ClaudeRequest struct {
 	AnthropicVersion string          `json:"anthropic_version"`
@@ -59,12 +61,12 @@ type ClaudeError struct {
 	Message string `json:"message"`
 }
 
-func NewClaude() llm.LLMClient {
-	return &ClaudeClient{}
+func NewClaude(cfg *config.Config) llm.LLMClient {
+	return &ClaudeClient{config: cfg}
 }
 
 func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
-	cfg := config.Get()
+	cfg := c.config
 
 	// Build Claude-specific endpoint
 	endpoint := fmt.Sprintf("%s/sonnet/models/%s:streamRawPredict", cfg.ModelAPI, cfg.ModelID)
@@ -76,7 +78,7 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 	})
 	req := ClaudeRequest{
 		AnthropicVersion: "vertex-2023-10-16",
-		System:           system.GetSystemPrompt(),
+		System:           system.GetSystemPrompt(cfg),
 		Messages: []ClaudeMessage{{
 			Role: "user",
 			Content: []ClaudeContent{{

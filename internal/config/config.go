@@ -5,8 +5,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"sync"
-	"testing"
 )
 
 type Config struct {
@@ -32,33 +30,8 @@ type ScoreThresholds struct {
 	ReviewRequired int // Score below which manual review is required
 }
 
-var (
-	instance *Config
-	once     sync.Once
-)
-
-func Get() *Config {
-	once.Do(func() {
-		var err error
-		instance, err = load()
-		if err != nil {
-			panic("Failed to load configuration: " + err.Error())
-		}
-	})
-	return instance
-}
-
-// Reset clears the singleton configuration, allowing it to be reloaded.
-// This function can only be called during tests.
-func Reset() {
-	if !testing.Testing() {
-		panic("Reset() can only be called during tests")
-	}
-	once = sync.Once{}
-	instance = nil
-}
-
-func load() (*Config, error) {
+// Load creates a new Config instance from environment variables
+func Load() (*Config, error) {
 	// Parse max response tokens with default
 	maxResponseTokens := 2000 // Default for LLM response length
 	if maxResponseTokensStr := os.Getenv("MODEL_MAX_RESPONSE_TOKENS"); maxResponseTokensStr != "" {
