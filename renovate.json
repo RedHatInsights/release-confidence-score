@@ -7,6 +7,7 @@
     "main"
   ],
   "tekton": {
-    "automerge": true
+    "automerge": true,
+    "schedule": ["at any time"]
   }
 }
