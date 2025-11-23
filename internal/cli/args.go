@@ -11,6 +11,7 @@ type Args struct {
 	Mode            string
 	CompareLinks    []string
 	MergeRequestIID int
+	PostToMR        bool
 	ShowHelp        bool
 }
 
@@ -27,6 +28,9 @@ func Parse() (*Args, error) {
 
 	flag.IntVar(&args.MergeRequestIID, "merge-request-iid", 0, "App-interface merge request IID (app-interface mode)")
 	flag.IntVar(&args.MergeRequestIID, "mr", 0, "Merge request IID (shorthand)")
+
+	flag.BoolVar(&args.PostToMR, "post-to-mr", false, "Post report as comment to merge request (app-interface mode only)")
+	flag.BoolVar(&args.PostToMR, "p", false, "Post to MR (shorthand)")
 
 	flag.BoolVar(&args.ShowHelp, "help", false, "Show help message")
 	flag.BoolVar(&args.ShowHelp, "h", false, "Show help message (shorthand)")
@@ -60,16 +64,24 @@ FLAGS:
   -m, --mode <mode>                  Operation mode: 'standalone' or 'app-interface'
   -c, --compare-links <urls>         Comma-separated compare URLs (standalone)
   -mr, --merge-request-iid <iid>     Merge request IID (app-interface)
+  -p, --post-to-mr                   Post report to merge request (app-interface only)
   -h, --help                         Show this help message
 
 EXAMPLES:
-  # Standalone mode
-  rcs --compare-links "https://github.com/org/repo/compare/v1.0...v1.1,https://github.com/org/api/compare/v2.0...v2.1"
+  # Standalone mode - print to stdout
   rcs -c "https://github.com/org/repo/compare/v1.0...v1.1"
 
-  # App-interface mode
-  rcs --mode app-interface --merge-request-iid 160191
+  # Standalone mode - save to file
+  rcs -c "https://github.com/org/repo/compare/v1.0...v1.1" > report.md
+
+  # App-interface mode - print to stdout
   rcs -m app-interface -mr 160191
+
+  # App-interface mode - save to file
+  rcs -m app-interface -mr 160191 > report.md
+
+  # App-interface mode - post to MR
+  rcs -m app-interface -mr 160191 -p
 
 CONFIGURATION:
   All configuration is set via environment variables.
