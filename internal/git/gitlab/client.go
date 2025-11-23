@@ -27,3 +27,17 @@ func NewClient(cfg *config.Config) *gitlab.Client {
 
 	return client
 }
+
+// PostMergeRequestComment posts a comment to a GitLab merge request
+func PostMergeRequestComment(client *gitlab.Client, projectID string, mrIID int, body string) error {
+	opts := &gitlab.CreateMergeRequestNoteOptions{
+		Body: &body,
+	}
+
+	_, _, err := client.Notes.CreateMergeRequestNote(projectID, mrIID, opts)
+	if err != nil {
+		return fmt.Errorf("failed to create merge request note: %w", err)
+	}
+
+	return nil
+}

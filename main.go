@@ -8,6 +8,7 @@ import (
 	"release-confidence-score/internal"
 	"release-confidence-score/internal/cli"
 	"release-confidence-score/internal/config"
+	"release-confidence-score/internal/git/gitlab"
 	"release-confidence-score/internal/logger"
 )
 
@@ -70,8 +71,16 @@ func main() {
 		log.Fatalf("Invalid mode '%s': must be 'standalone' or 'app-interface'", mode)
 	}
 
-	// Output results
-	fmt.Printf("Report:\n%s", report)
+	// Output report
+	if args.PostToMR {
+		// Post to GitLab MR
+		if err := postReportToMR(report, args.MergeRequestIID, cfg); err != nil {
+			log.Fatalf("Failed to post report to MR: %v", err)
+		}
+	} else {
+		// Print to stdout (user can redirect to file if needed)
+		fmt.Print(report)
+	}
 }
 
 func determineMode(args *cli.Args) string {
@@ -100,9 +109,15 @@ func validateArgs(mode string, args *cli.Args) error {
 		}
 	case "standalone":
 		if len(args.CompareLinks) == 0 {
-			return fmt.Errorf("standalone mode requires compare URLs\n\nTry:\n  rcs --compare-links <url1>,<url2>\n  rcs <url1> <url2>\n\nOr run 'rcs --help' for more information")
+			return fmt.Errorf("standalone mode requires compare URLs\n\nTry:\n  rcs --compare-links <url1>,<url2>\n\nOr run 'rcs --help' for more information")
 		}
 	}
+
+	// Validate --post-to-mr is only used in app-interface mode
+	if args.PostToMR && mode != "app-interface" {
+		return fmt.Errorf("--post-to-mr is only available in app-interface mode")
+	}
+
 	return nil
 }
 
@@ -112,5 +127,17 @@ func validateConfig(mode string, cfg *config.Config) error {
 			return fmt.Errorf("GITLAB_BASE_URL environment variable is required for app-interface mode")
 		}
 	}
+	return nil
+}
+
+func postReportToMR(report string, mrIID int, cfg *config.Config) error {
+	gitlabClient := gitlab.NewClient(cfg)
+	projectID := "service/app-interface"
+
+	if err := gitlab.PostMergeRequestComment(gitlabClient, projectID, mrIID, report); err != nil {
+		return fmt.Errorf("failed to post comment to MR: %w", err)
+	}
+
+	fmt.Fprintf(os.Stderr, "Report posted to merge request !%d\n", mrIID)
 	return nil
 }
