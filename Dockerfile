@@ -15,8 +15,8 @@ USER 1001
 RUN go mod download
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -o release-confidence-score .
-RUN strip release-confidence-score
+RUN CGO_ENABLED=0 GOOS=linux go build -o rcs .
+RUN strip rcs
 
 # Runtime stage
 FROM registry.access.redhat.com/ubi9/ubi-minimal
@@ -28,9 +28,9 @@ WORKDIR /app
 RUN chmod +x /app
 
 # Copy the binary from build stage
-COPY --from=build /opt/app-root/src/release-confidence-score /app/release-confidence-score
+COPY --from=build /opt/app-root/src/rcs /app/rcs
 
 USER 1001
 
 # Run the binary
-ENTRYPOINT ["/app/release-confidence-score"]
+ENTRYPOINT ["/app/rcs"]

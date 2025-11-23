@@ -1,5 +1,5 @@
 services:
-  release-confidence-score:
+  rcs:
     build: .
     env_file: .env
     environment:

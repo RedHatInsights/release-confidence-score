@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"release-confidence-score/internal/app_interface"
+	"release-confidence-score/internal/changelog"
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/github"
 	"release-confidence-score/internal/git/gitlab"
@@ -44,8 +45,8 @@ func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 	}, nil
 }
 
-func (ra *ReleaseAnalyzer) Analyze(mergeRequestIID int) (float64, string, error) {
-	slog.Debug("Starting release analysis")
+func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int) (float64, string, error) {
+	slog.Debug("Starting release analysis in app-interface mode")
 
 	// Phase 1: Fetch all data
 	// Get diff URLs and user guidance from merge request notes
@@ -65,13 +66,40 @@ func (ra *ReleaseAnalyzer) Analyze(mergeRequestIID int) (float64, string, error)
 	allUserGuidance = append(allUserGuidance, appInterfaceGuidance...)
 	allUserGuidance = append(allUserGuidance, githubGuidance...)
 
+	return ra.analyze(changelogs, allUserGuidance, documentation, comparisons)
+}
+
+// AnalyzeStandalone performs release analysis using compare URLs directly (standalone mode)
+func (ra *ReleaseAnalyzer) AnalyzeStandalone(compareURLs []string) (float64, string, error) {
+	slog.Debug("Starting release analysis in standalone mode", "url_count", len(compareURLs))
+
+	if len(compareURLs) == 0 {
+		return 0, "", fmt.Errorf("no compare URLs provided")
+	}
+
+	// Fetch raw release data from GitHub
+	changelogs, githubGuidance, documentation, comparisons, err := GetReleaseData(ra.githubClient, ra.config, compareURLs)
+	if err != nil {
+		return 0, "", fmt.Errorf("failed to fetch release data: %w", err)
+	}
+
+	return ra.analyze(changelogs, githubGuidance, documentation, comparisons)
+}
+
+// analyzeRelease is the common analysis logic used by both modes
+func (ra *ReleaseAnalyzer) analyze(
+	changelogs []*changelog.Changelog,
+	userGuidance []shared.UserGuidance,
+	documentation []*github.RepoDocumentation,
+	comparisons []*github.CompareData,
+) (float64, string, error) {
 	// Process QE testing labels from changelogs
 	qeTestingCommits := qe.BuildTestingCommits(changelogs)
 
 	// Phases 2-4: Format data, submit prompt, and handle truncation retries
 	// This is handled internally by AnalyzeWithProgressiveTruncation
 	response, truncationInfo, err := llm.AnalyzeWithProgressiveTruncation(
-		ra.llmClient, comparisons, documentation, allUserGuidance, qeTestingCommits)
+		ra.llmClient, comparisons, documentation, userGuidance, qeTestingCommits)
 	if err != nil {
 		return 0, "", err
 	}
@@ -90,7 +118,7 @@ func (ra *ReleaseAnalyzer) Analyze(mergeRequestIID int) (float64, string, error)
 	}
 
 	// Process the analysis into final report using embedded template
-	finalReport, err := report.ProcessAnalysis(analysis, reportMetadata, changelogs, documentation, allUserGuidance,
+	finalReport, err := report.ProcessAnalysis(analysis, reportMetadata, changelogs, documentation, userGuidance,
 		truncationInfo, ra.config.ScoreThresholds.AutoDeploy, ra.config.ScoreThresholds.ReviewRequired)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to process analysis into report: %w", err)
