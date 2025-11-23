@@ -117,10 +117,6 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("GITHUB_TOKEN environment variable is required")
 	}
 
-	if cfg.GitLabBaseURL == "" {
-		return nil, fmt.Errorf("GITLAB_BASE_URL environment variable is required")
-	}
-
 	if cfg.GitLabToken == "" {
 		return nil, fmt.Errorf("GITLAB_TOKEN environment variable is required")
 	}
