@@ -10,7 +10,7 @@ import (
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/shared"
 
-	"github.com/google/go-github/v79/github"
+	"github.com/google/go-github/v80/github"
 )
 
 // CompareData holds raw comparison data that can be truncated and reformatted

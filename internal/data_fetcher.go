@@ -8,7 +8,7 @@ import (
 	"release-confidence-score/internal/git/github"
 	"release-confidence-score/internal/shared"
 
-	githubapi "github.com/google/go-github/v79/github"
+	githubapi "github.com/google/go-github/v80/github"
 )
 
 // GetReleaseData fetches raw release data from multiple GitHub compare URLs
