@@ -29,6 +29,10 @@ Whether you're making manual release decisions or using automated gates in your 
 
 ## Quick Start
 
+RCS supports two operation modes:
+- **App-Interface Mode**: Analyzes app-interface merge requests with automatic diff collection
+- **Standalone Mode**: Analyzes GitHub/GitLab compare URLs directly
+
 ### Using Docker Compose (Recommended)
 
 1. **Clone the repository**
@@ -43,15 +47,26 @@ Whether you're making manual release decisions or using automated gates in your 
    # Edit .env with your credentials
    ```
 
-3. **Build and run**
+3. **Build the image**
    ```bash
    docker compose build
-   docker compose run --rm release-confidence-score <app-interface-merge-request-iid>
    ```
 
-   Example:
+4. **Run analysis**
+
+   **App-Interface Mode:**
    ```bash
-   docker compose run --rm release-confidence-score 160191
+   docker compose run --rm rcs --mode app-interface --merge-request-iid 160191
+   ```
+
+   **Standalone Mode:**
+   ```bash
+   docker compose run --rm rcs --compare-links "https://github.com/org/repo/compare/v1.0...v1.1"
+   ```
+
+   **Post report to merge request:**
+   ```bash
+   docker compose run --rm rcs --mode app-interface --merge-request-iid 160191 --post-to-mr
    ```
 
 ### Using Go Directly
@@ -73,14 +88,32 @@ Whether you're making manual release decisions or using automated gates in your 
    export RCS_CLAUDE_USER_KEY="your_claude_api_key"
    ```
 
-3. **Run the application**
+3. **Build the application**
    ```bash
-   go run main.go <app-interface-merge-request-iid>
+   go build -o rcs
    ```
 
-   Example:
+4. **Run analysis**
+
+   **App-Interface Mode:**
    ```bash
-   go run main.go 160191
+   ./rcs --mode app-interface --merge-request-iid 160191
+   ```
+
+   **Standalone Mode:**
+   ```bash
+   ./rcs --compare-links "https://github.com/org/repo/compare/v1.0...v1.1,https://github.com/org/other/compare/v2.0...v2.1"
+   ```
+
+   **Using shorthand flags:**
+   ```bash
+   ./rcs -m app-interface -mr 160191
+   ./rcs -c "https://github.com/org/repo/compare/v1.0...v1.1"
+   ```
+
+   **Get help:**
+   ```bash
+   ./rcs --help
    ```
 
 ## Configuration
@@ -120,9 +153,14 @@ For Llama:
 - `RCS_MODEL_SKIP_SSL_VERIFY`: Skip SSL verification for AI provider (default: false).
 - `RCS_MODEL_MAX_RESPONSE_TOKENS`: Maximum tokens in AI response (default: 2000).
 - `RCS_MODEL_TIMEOUT_SECONDS`: Request timeout in seconds (default: 120).
+- `RCS_SYSTEM_PROMPT_VERSION`: System prompt version to use (default: v1).
 
 **GitLab Configuration:**
 - `RCS_GITLAB_SKIP_SSL_VERIFY`: Skip SSL verification (default: false).
+
+**Logging Configuration:**
+- `RCS_LOG_FORMAT`: Log output format - `text` or `json` (default: text).
+- `RCS_LOG_LEVEL`: Log level - `debug`, `info`, `warn`, or `error` (default: info).
 
 **Score Thresholds:**
 - `RCS_SCORE_THRESHOLD_AUTO_DEPLOY`: Minimum score for auto-deployment recommendation (default: 80).
@@ -132,11 +170,19 @@ See `.env.example` for a complete configuration template.
 
 ## How RCS Works
 
+### App-Interface Mode
 1. **App-Interface Data Collection**: Fetches merge request details from GitLab app-interface repository, including diff URLs and user guidance from merge request comments.
 2. **Repository Data Collection**: Retrieves commits, documentation, user guidance, and QE testing labels from GitHub and GitLab repositories being released.
 3. **Data Processing**: Analyzes and formats collected data, builds changelogs from commits, processes QE testing labels to assess test coverage, and prepares consolidated context for AI analysis.
 4. **AI Analysis**: Sends consolidated data with specialized system prompt to the configured AI provider for risk assessment.
 5. **Report Generation**: Produces a detailed report with confidence score, risk factors, release recommendations, changelogs, user guidance (with author authorization status), diff truncation details when applicable, and tips for improving future analysis with better documentation.
+6. **Optional MR Posting**: If `--post-to-mr` flag is used, posts the report as a comment on the merge request.
+
+### Standalone Mode
+1. **Repository Data Collection**: Directly analyzes the provided GitHub/GitLab compare URLs, retrieving commits, documentation, user guidance, and QE testing labels.
+2. **Data Processing**: Same as app-interface mode - analyzes data, builds changelogs, processes QE labels.
+3. **AI Analysis**: Sends consolidated data with specialized system prompt to the configured AI provider for risk assessment.
+4. **Report Generation**: Produces the same detailed report and prints to stdout.
 
 ![How RCS Works](./how-rcs-works.svg)
 
@@ -157,3 +203,24 @@ Automatically handles large diffs that exceed AI context windows using progressi
 RCS automatically fetches `.release-confidence-docs.md` from repository roots to provide release context that improves AI analysis accuracy.
 Links listed in the "Additional Documentation" section are also fetched and analyzed.
 The AI uses this documentation to provide context-aware risk assessment tailored to your specific service.
+
+### User Guidance from Comments
+
+Developers can provide release-specific guidance in pull request/merge request comments to help the AI make better decisions.
+
+**Format (all platforms):**
+```
+/rcs This release includes database migrations that require manual steps after deployment.
+```
+
+The `/rcs` prefix can appear anywhere in the comment, and everything after it is captured as guidance. Multiple lines are supported.
+
+**Authorization**: Only guidance from the PR/MR author or approvers is marked as authorized and weighted more heavily in the analysis.
+
+### QE Testing Labels
+
+RCS recognizes QE testing labels on pull requests and merge requests:
+- `rcs/qe-tested`: Changes have been verified by QE
+- `rcs/needs-qe-testing`: Changes require QE verification
+
+These labels are included in the analysis to help assess test coverage and release risk.
