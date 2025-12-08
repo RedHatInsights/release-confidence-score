@@ -7,11 +7,10 @@ import (
 	"regexp"
 	"strings"
 
+	githubapi "github.com/google/go-github/v80/github"
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
-
-	githubapi "github.com/google/go-github/v79/github"
 )
 
 // githubCompareRegex matches GitHub compare URLs and extracts components
