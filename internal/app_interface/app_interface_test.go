@@ -3,7 +3,7 @@ package app_interface
 import (
 	"fmt"
 	"release-confidence-score/internal/config"
-	"release-confidence-score/internal/shared"
+	"release-confidence-score/internal/git/types"
 	"testing"
 	"time"
 
@@ -162,13 +162,13 @@ func TestExtractDiffURLsFromBot(t *testing.T) {
 
 func TestExtractUserGuidance(t *testing.T) {
 	// Set up config for URL generation
-	t.Setenv("GITHUB_TOKEN", "test-token")
-	t.Setenv("GITLAB_BASE_URL", "https://gitlab.example.com")
-	t.Setenv("GITLAB_TOKEN", "test-token")
-	t.Setenv("CLAUDE_MODEL_API", "https://api.example.com")
-	t.Setenv("CLAUDE_MODEL_ID", "test-model")
-	t.Setenv("CLAUDE_USER_KEY", "test-key")
-	cfg, err := config.Load()
+	t.Setenv("RCS_GITHUB_TOKEN", "test-token")
+	t.Setenv("RCS_GITLAB_BASE_URL", "https://gitlab.example.com")
+	t.Setenv("RCS_GITLAB_TOKEN", "test-token")
+	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
+	t.Setenv("RCS_CLAUDE_MODEL_ID", "test-model")
+	t.Setenv("RCS_CLAUDE_USER_KEY", "test-key")
+	cfg, err := config.Load(true) // app-interface mode
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)
 	}
@@ -179,7 +179,7 @@ func TestExtractUserGuidance(t *testing.T) {
 	tests := []struct {
 		name     string
 		notes    []*gitlabapi.Note
-		expected []shared.UserGuidance
+		expected []types.UserGuidance
 	}{
 		{
 			name: "single guidance",
@@ -191,7 +191,7 @@ func TestExtractUserGuidance(t *testing.T) {
 					CreatedAt: &createdAt,
 				},
 			},
-			expected: []shared.UserGuidance{
+			expected: []types.UserGuidance{
 				{
 					Content:      "please review carefully",
 					Author:       "alice",
@@ -217,7 +217,7 @@ func TestExtractUserGuidance(t *testing.T) {
 					CreatedAt: &createdAt,
 				},
 			},
-			expected: []shared.UserGuidance{
+			expected: []types.UserGuidance{
 				{
 					Content:      "first guidance",
 					Author:       "alice",
@@ -256,7 +256,7 @@ func TestExtractUserGuidance(t *testing.T) {
 					CreatedAt: &createdAt,
 				},
 			},
-			expected: []shared.UserGuidance{
+			expected: []types.UserGuidance{
 				{
 					Content:      "important guidance",
 					Author:       "bob",
@@ -276,7 +276,7 @@ func TestExtractUserGuidance(t *testing.T) {
 					CreatedAt: &createdAt,
 				},
 			},
-			expected: []shared.UserGuidance{
+			expected: []types.UserGuidance{
 				{
 					Content:      "line 1\nline 2\nline 3",
 					Author:       "alice",
@@ -296,7 +296,7 @@ func TestExtractUserGuidance(t *testing.T) {
 					CreatedAt: &createdAt,
 				},
 			},
-			expected: []shared.UserGuidance{},
+			expected: []types.UserGuidance{},
 		},
 		{
 			name: "skip note with nil CreatedAt",
@@ -314,7 +314,7 @@ func TestExtractUserGuidance(t *testing.T) {
 					CreatedAt: &createdAt,
 				},
 			},
-			expected: []shared.UserGuidance{
+			expected: []types.UserGuidance{
 				{
 					Content:      "should be included",
 					Author:       "bob",
@@ -327,7 +327,7 @@ func TestExtractUserGuidance(t *testing.T) {
 		{
 			name:     "empty notes list",
 			notes:    []*gitlabapi.Note{},
-			expected: []shared.UserGuidance{},
+			expected: []types.UserGuidance{},
 		},
 	}
 
@@ -363,4 +363,22 @@ func TestExtractUserGuidance(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestPostReportToMR(t *testing.T) {
+	// Note: This function now accepts a client as a parameter, making it much more testable.
+	// To fully test this, you would need to:
+	// 1. Create a mock GitLab client that implements the Notes.CreateMergeRequestNote interface
+	// 2. Test success case: mock returns no error
+	// 3. Test error case: mock returns error
+	// 4. Verify the correct parameters are passed (projectID, mrIID, report body)
+	//
+	// For now, we document the test approach. A full implementation would require
+	// a mocking library or custom test doubles.
+
+	t.Run("function signature accepts client parameter", func(t *testing.T) {
+		// Verify the function exists with the expected signature
+		// This is a compile-time check that ensures the refactoring is correct
+		var _ func(*gitlabapi.Client, string, int) error = PostReportToMR
+	})
 }

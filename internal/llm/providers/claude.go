@@ -2,20 +2,17 @@ package providers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 
 	"release-confidence-score/internal/config"
-	"release-confidence-score/internal/llm"
+	httputil "release-confidence-score/internal/http"
+	llmerrors "release-confidence-score/internal/llm/errors"
 	"release-confidence-score/internal/llm/prompts/system"
-	"release-confidence-score/internal/logger"
-	"release-confidence-score/internal/shared"
 )
 
 type ClaudeClient struct {
@@ -50,18 +47,7 @@ type ClaudeUsage struct {
 	OutputTokens int `json:"output_tokens"`
 }
 
-type ClaudeErrorResponse struct {
-	Type      string      `json:"type"`
-	Error     ClaudeError `json:"error"`
-	RequestID string      `json:"request_id"`
-}
-
-type ClaudeError struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
-}
-
-func NewClaude(cfg *config.Config) llm.LLMClient {
+func NewClaude(cfg *config.Config) LLMClient {
 	return &ClaudeClient{config: cfg}
 }
 
@@ -72,8 +58,8 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 	endpoint := fmt.Sprintf("%s/sonnet/models/%s:streamRawPredict", cfg.ModelAPI, cfg.ModelID)
 
 	// Create HTTP client
-	httpClient := shared.NewHTTPClient(shared.HTTPClientOptions{
-		Timeout:       time.Duration(cfg.TimeoutSeconds) * time.Second,
+	httpClient := httputil.NewHTTPClient(httputil.HTTPClientOptions{
+		Timeout:       time.Duration(cfg.ModelTimeoutSeconds) * time.Second,
 		SkipSSLVerify: cfg.ModelSkipSSLVerify,
 	})
 	req := ClaudeRequest{
@@ -86,7 +72,7 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 				Text: userPrompt,
 			}},
 		}},
-		MaxTokens:   cfg.MaxResponseTokens,
+		MaxTokens:   cfg.ModelMaxResponseTokens,
 		Temperature: 0,
 	}
 
@@ -95,7 +81,7 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	slog.Log(context.Background(), logger.LevelTrace, "Claude API request", "request", jsonData)
+	slog.Debug("Claude API request", "request", jsonData)
 
 	httpReq, err := http.NewRequest("POST", endpoint, bytes.NewBuffer(jsonData))
 	if err != nil {
@@ -103,7 +89,7 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.UserKey)
+	httpReq.Header.Set("Authorization", "Bearer "+cfg.ModelUserKey)
 
 	slog.Debug("Sending release analysis request to LLM", "provider", "Claude", "model", cfg.ModelID)
 
@@ -119,21 +105,14 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		// Try to parse Claude's structured error response
-		var errorResp ClaudeErrorResponse
-		if err := json.Unmarshal(body, &errorResp); err == nil {
-			// Check if this is Claude's "Prompt is too long" error
-			if errorResp.Type == "error" &&
-				errorResp.Error.Type == "invalid_request_error" &&
-				strings.Contains(strings.ToLower(errorResp.Error.Message), "prompt is too long") {
-				return "", &llm.ContextWindowError{
-					StatusCode: resp.StatusCode,
-					Message:    errorResp.Error.Message,
-					Provider:   "Claude",
-				}
+		// Check if this is a context window error
+		if llmerrors.IsContextWindowError(resp.StatusCode, body) {
+			return "", &llmerrors.ContextWindowError{
+				StatusCode: resp.StatusCode,
+				Message:    string(body),
+				Provider:   "Claude",
 			}
 		}
-		// Not a context window error, return generic error
 		return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))
 	}
 
@@ -146,7 +125,7 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 		return "", fmt.Errorf("no content in response")
 	}
 
-	slog.Log(context.Background(), logger.LevelTrace, "Claude API response", "response", response)
+	slog.Debug("Claude API response", "response", response)
 
 	slog.Debug("Claude API token usage",
 		"input_tokens", response.Usage.InputTokens,

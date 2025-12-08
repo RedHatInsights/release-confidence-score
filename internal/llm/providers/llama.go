@@ -2,7 +2,6 @@ package providers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,10 +10,9 @@ import (
 	"time"
 
 	"release-confidence-score/internal/config"
-	"release-confidence-score/internal/llm"
+	httputil "release-confidence-score/internal/http"
+	llmerrors "release-confidence-score/internal/llm/errors"
 	"release-confidence-score/internal/llm/prompts/system"
-	"release-confidence-score/internal/logger"
-	"release-confidence-score/internal/shared"
 )
 
 type LlamaClient struct {
@@ -43,7 +41,7 @@ type LlamaUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-func NewLlama(cfg *config.Config) llm.LLMClient {
+func NewLlama(cfg *config.Config) LLMClient {
 	return &LlamaClient{config: cfg}
 }
 
@@ -56,7 +54,7 @@ func (l *LlamaClient) Analyze(userPrompt string) (string, error) {
 	req := LlamaRequest{
 		Model:       cfg.ModelID,
 		Prompt:      combinedPrompt,
-		MaxTokens:   cfg.MaxResponseTokens,
+		MaxTokens:   cfg.ModelMaxResponseTokens,
 		Temperature: 0,
 	}
 
@@ -65,7 +63,7 @@ func (l *LlamaClient) Analyze(userPrompt string) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	slog.Log(context.Background(), logger.LevelTrace, "Llama API request", "request", jsonData)
+	slog.Debug("Llama API request", "request", jsonData)
 
 	url := cfg.ModelAPI + "/v1/completions"
 	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
@@ -74,10 +72,10 @@ func (l *LlamaClient) Analyze(userPrompt string) (string, error) {
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.UserKey)
+	httpReq.Header.Set("Authorization", "Bearer "+cfg.ModelUserKey)
 
-	httpClient := shared.NewHTTPClient(shared.HTTPClientOptions{
-		Timeout:       time.Duration(cfg.TimeoutSeconds) * time.Second,
+	httpClient := httputil.NewHTTPClient(httputil.HTTPClientOptions{
+		Timeout:       time.Duration(cfg.ModelTimeoutSeconds) * time.Second,
 		SkipSSLVerify: cfg.ModelSkipSSLVerify,
 	})
 
@@ -96,8 +94,8 @@ func (l *LlamaClient) Analyze(userPrompt string) (string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		// Check if this is a context window error
-		if llm.IsContextWindowError(resp.StatusCode, body) {
-			return "", &llm.ContextWindowError{
+		if llmerrors.IsContextWindowError(resp.StatusCode, body) {
+			return "", &llmerrors.ContextWindowError{
 				StatusCode: resp.StatusCode,
 				Message:    string(body),
 				Provider:   "Llama",
@@ -115,7 +113,7 @@ func (l *LlamaClient) Analyze(userPrompt string) (string, error) {
 		return "", fmt.Errorf("no choices in response")
 	}
 
-	slog.Log(context.Background(), logger.LevelTrace, "Llama API response", "response", response)
+	slog.Debug("Llama API response", "response", response)
 
 	slog.Debug("Llama API token usage",
 		"input_tokens", response.Usage.PromptTokens,

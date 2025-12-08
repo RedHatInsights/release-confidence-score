@@ -1,105 +1,91 @@
 package github
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
-	"release-confidence-score/internal/shared"
-
 	"github.com/google/go-github/v79/github"
+	"release-confidence-score/internal/git/types"
 )
 
-// gitHubComment is an interface for GitHub comment types
-type gitHubComment interface {
-	GetBody() string
-	GetUser() *github.User
-	GetCreatedAt() github.Timestamp
-	GetHTMLURL() string
+// FetchUserGuidance extracts user guidance from all PRs in the comparison
+func FetchUserGuidance(client *github.Client, owner, repo string, comparison *types.Comparison) ([]types.UserGuidance, error) {
+	if comparison == nil || len(comparison.Commits) == 0 {
+		return []types.UserGuidance{}, nil
+	}
+
+	slog.Debug("Extracting user guidance from comparison", "commits", len(comparison.Commits))
+
+	// Create cache to avoid duplicate API calls
+	cache := newPRCache()
+	var allGuidance []types.UserGuidance
+
+	// Track which PRs we've already processed to avoid duplicates
+	processedPRs := make(map[int]bool)
+
+	// Extract guidance from each unique PR
+	for _, commit := range comparison.Commits {
+		if commit.PRNumber == 0 || processedPRs[commit.PRNumber] {
+			continue
+		}
+
+		processedPRs[commit.PRNumber] = true
+
+		// Get PR object
+		pr, err := cache.getOrFetchPR(client, owner, repo, commit.PRNumber)
+		if err != nil {
+			slog.Warn("Failed to fetch PR for guidance extraction", "pr", commit.PRNumber, "error", err)
+			continue
+		}
+
+		if pr == nil {
+			continue
+		}
+
+		// Extract guidance from this PR
+		slog.Debug("Extracting user guidance from PR", "pr", commit.PRNumber)
+		guidance, err := extractUserGuidance(client, owner, repo, pr, cache)
+		if err != nil {
+			slog.Warn("Failed to extract user guidance", "pr", commit.PRNumber, "error", err)
+		} else if len(guidance) > 0 {
+			allGuidance = append(allGuidance, guidance...)
+		}
+	}
+
+	slog.Debug("User guidance extraction complete", "items", len(allGuidance))
+	return allGuidance, nil
 }
 
-// GetPRUserGuidance extracts all user guidance from a PR's comments
-// Returns empty slice if no guidance found
-// Accepts a PR object to avoid duplicate API calls - the PR should be cached
-// Uses cache for comments and reviews to avoid duplicate API calls
-func GetPRUserGuidance(client *github.Client, owner, repo string, pr *github.PullRequest, githubCache *githubCache) ([]shared.UserGuidance, error) {
+// extractUserGuidance extracts all user guidance from a PR's comments
+func extractUserGuidance(client *github.Client, owner, repo string, pr *github.PullRequest, cache *prCache) ([]types.UserGuidance, error) {
 	if pr == nil {
 		return nil, nil
 	}
 
 	prNumber := pr.GetNumber()
+	var allGuidance []types.UserGuidance
 
-	var allUserGuidance []shared.UserGuidance
-
-	// Check issue comments (PR discussion) - most likely location for user guidance
-	comments, err := githubCache.getOrFetchIssueComments(client, owner, repo, prNumber)
+	// Check issue comments (PR discussion)
+	issueComments, err := cache.getOrFetchIssueComments(client, owner, repo, prNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get comments for PR #%d: %w", prNumber, err)
 	}
 
-	// Extract ALL user guidance from issue comments (both authorized and unauthorized)
-	issueGuidance := parseUserGuidanceFromIssueComments(client, pr, comments, githubCache)
-	allUserGuidance = append(allUserGuidance, issueGuidance...)
-
-	// Also check PR review comments (less common for RCS, but possible)
-	reviewComments, err := githubCache.getOrFetchReviewComments(client, owner, repo, prNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get review comments for PR #%d: %w", prNumber, err)
-	}
-
-	// Extract ALL user guidance from review comments (both authorized and unauthorized)
-	reviewGuidance := parseUserGuidanceFromReviewComments(client, pr, reviewComments, githubCache)
-	allUserGuidance = append(allUserGuidance, reviewGuidance...)
-
-	// Log summary
-	authorizedCount := 0
-	for _, guidance := range allUserGuidance {
-		if guidance.IsAuthorized {
-			authorizedCount++
-		}
-	}
-
-	slog.Debug("User guidance summary",
-		"pr", prNumber,
-		"total_guidance", len(allUserGuidance),
-		"authorized", authorizedCount)
-
-	return allUserGuidance, nil
-}
-
-// parseUserGuidanceFromIssueComments extracts ALL user guidance from GitHub issue comments with full metadata
-func parseUserGuidanceFromIssueComments(client *github.Client, pr *github.PullRequest, comments []*github.IssueComment, githubCache *githubCache) []shared.UserGuidance {
-	return parseGuidanceFromComments(client, pr, comments, githubCache)
-}
-
-// parseUserGuidanceFromReviewComments extracts ALL user guidance from GitHub review comments with full metadata
-func parseUserGuidanceFromReviewComments(client *github.Client, pr *github.PullRequest, comments []*github.PullRequestComment, githubCache *githubCache) []shared.UserGuidance {
-	return parseGuidanceFromComments(client, pr, comments, githubCache)
-}
-
-// parseGuidanceFromComments is a generic helper that extracts guidance from any GitHub comment type
-func parseGuidanceFromComments[T gitHubComment](client *github.Client, pr *github.PullRequest, comments []T, githubCache *githubCache) []shared.UserGuidance {
-	var allGuidance []shared.UserGuidance
-
-	for _, comment := range comments {
-		guidanceContent, found := shared.ParseUserGuidance(comment.GetBody())
+	for _, comment := range issueComments {
+		guidanceContent, found := types.ParseUserGuidance(comment.GetBody())
 		if !found {
 			continue
 		}
 
 		author := comment.GetUser().GetLogin()
-
-		// Check authorization
-		isAuthorized, err := isPRAuthorOrApprover(client, pr, author, githubCache)
+		isAuthorized, err := isAuthorized(client, pr, author, cache)
 		if err != nil {
-			slog.Warn("Failed to check permissions for user guidance",
-				"author", author,
-				"guidance", guidanceContent,
-				"error", err)
+			slog.Warn("Failed to check authorization for guidance", "author", author, "error", err)
 			isAuthorized = false
 		}
 
-		// Create UserGuidance with metadata
-		guidance := shared.UserGuidance{
+		guidance := types.UserGuidance{
 			Content:      guidanceContent,
 			Author:       author,
 			Date:         comment.GetCreatedAt().Time,
@@ -107,37 +93,63 @@ func parseGuidanceFromComments[T gitHubComment](client *github.Client, pr *githu
 			IsAuthorized: isAuthorized,
 		}
 
-		slog.Debug("Found GitHub user guidance",
-			"author", guidance.Author,
-			"guidance", guidance.Content,
-			"authorized", guidance.IsAuthorized)
-
+		slog.Debug("Found user guidance in issue comment", "pr", prNumber, "author", author, "authorized", isAuthorized)
 		allGuidance = append(allGuidance, guidance)
 	}
 
-	return allGuidance
+	// Check review comments
+	reviewComments, err := cache.getOrFetchReviewComments(client, owner, repo, prNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get review comments for PR #%d: %w", prNumber, err)
+	}
+
+	for _, comment := range reviewComments {
+		guidanceContent, found := types.ParseUserGuidance(comment.GetBody())
+		if !found {
+			continue
+		}
+
+		author := comment.GetUser().GetLogin()
+		isAuthorized, err := isAuthorized(client, pr, author, cache)
+		if err != nil {
+			slog.Warn("Failed to check authorization for guidance", "author", author, "error", err)
+			isAuthorized = false
+		}
+
+		guidance := types.UserGuidance{
+			Content:      guidanceContent,
+			Author:       author,
+			Date:         comment.GetCreatedAt().Time,
+			CommentURL:   comment.GetHTMLURL(),
+			IsAuthorized: isAuthorized,
+		}
+
+		slog.Debug("Found user guidance in review comment", "pr", prNumber, "author", author, "authorized", isAuthorized)
+		allGuidance = append(allGuidance, guidance)
+	}
+
+	return allGuidance, nil
 }
 
-// isPRAuthorOrApprover checks if the user is either the PR author or one of the meaningful approvers
-func isPRAuthorOrApprover(client *github.Client, pr *github.PullRequest, username string, githubCache *githubCache) (bool, error) {
-
+// isAuthorized checks if a user is authorized to provide guidance (PR author or approver)
+func isAuthorized(client *github.Client, pr *github.PullRequest, username string, cache *prCache) (bool, error) {
 	// Check if user is the PR author
 	if pr.User != nil && pr.User.GetLogin() == username {
 		slog.Debug("User authorized as PR author", "user", username, "pr", pr.GetNumber())
 		return true, nil
 	}
 
-	// Get PR reviews to check for approvals (cached to avoid duplicate API calls)
+	// Get PR reviews (cached)
 	owner := pr.GetBase().GetRepo().GetOwner().GetLogin()
 	repo := pr.GetBase().GetRepo().GetName()
 	prNumber := pr.GetNumber()
 
-	reviews, err := githubCache.getOrFetchReviews(client, owner, repo, prNumber)
+	reviews, err := cache.getOrFetchReviews(client, owner, repo, prNumber)
 	if err != nil {
 		return false, fmt.Errorf("failed to get reviews for PR #%d: %w", prNumber, err)
 	}
 
-	// Find the user's latest review (users can change their review)
+	// Find the user's latest review
 	var latestReview *github.PullRequestReview
 	for _, review := range reviews {
 		if review.User == nil || review.SubmittedAt == nil || review.User.GetLogin() != username {
@@ -149,18 +161,71 @@ func isPRAuthorOrApprover(client *github.Client, pr *github.PullRequest, usernam
 		}
 	}
 
-	// Check if user approved with meaningful authority (OWNER, MEMBER, or COLLABORATOR)
+	// Check if user approved with meaningful authority
 	if latestReview != nil && latestReview.GetState() == "APPROVED" {
 		association := latestReview.GetAuthorAssociation()
 		if association == "OWNER" || association == "MEMBER" || association == "COLLABORATOR" {
-			slog.Debug("User authorized as meaningful PR approver",
-				"user", username,
-				"pr", pr.GetNumber(),
-				"association", association)
+			slog.Debug("User authorized as approver", "user", username, "pr", prNumber, "association", association)
 			return true, nil
 		}
 	}
 
-	slog.Debug("User not authorized (not author or approver)", "user", username, "pr", pr.GetNumber())
+	slog.Debug("User not authorized", "user", username, "pr", prNumber)
 	return false, nil
+}
+
+// Cache methods for user guidance extraction
+
+func (c *prCache) getOrFetchIssueComments(client *github.Client, owner, repo string, prNumber int) ([]*github.IssueComment, error) {
+	key := cacheKey(owner, repo, prNumber)
+
+	if comments, exists := c.prIssueComments[key]; exists {
+		slog.Debug("Using cached issue comments", "pr", prNumber, "count", len(comments))
+		return comments, nil
+	}
+
+	comments, resp, err := client.Issues.ListComments(context.Background(), owner, repo, prNumber, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get comments for PR #%d: %w", prNumber, err)
+	}
+
+	slog.Debug("GitHub API response", "pr", prNumber, "comments", len(comments), "rate_limit_remaining", resp.Rate.Remaining)
+	c.prIssueComments[key] = comments
+	return comments, nil
+}
+
+func (c *prCache) getOrFetchReviewComments(client *github.Client, owner, repo string, prNumber int) ([]*github.PullRequestComment, error) {
+	key := cacheKey(owner, repo, prNumber)
+
+	if comments, exists := c.prReviewComments[key]; exists {
+		slog.Debug("Using cached review comments", "pr", prNumber, "count", len(comments))
+		return comments, nil
+	}
+
+	comments, resp, err := client.PullRequests.ListComments(context.Background(), owner, repo, prNumber, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get review comments for PR #%d: %w", prNumber, err)
+	}
+
+	slog.Debug("GitHub API response", "pr", prNumber, "review_comments", len(comments), "rate_limit_remaining", resp.Rate.Remaining)
+	c.prReviewComments[key] = comments
+	return comments, nil
+}
+
+func (c *prCache) getOrFetchReviews(client *github.Client, owner, repo string, prNumber int) ([]*github.PullRequestReview, error) {
+	key := cacheKey(owner, repo, prNumber)
+
+	if reviews, exists := c.prReviews[key]; exists {
+		slog.Debug("Using cached PR reviews", "pr", prNumber, "count", len(reviews))
+		return reviews, nil
+	}
+
+	reviews, resp, err := client.PullRequests.ListReviews(context.Background(), owner, repo, prNumber, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get reviews for PR #%d: %w", prNumber, err)
+	}
+
+	slog.Debug("GitHub API response", "pr", prNumber, "reviews", len(reviews), "rate_limit_remaining", resp.Rate.Remaining)
+	c.prReviews[key] = reviews
+	return reviews, nil
 }

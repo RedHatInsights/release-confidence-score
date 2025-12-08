@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"release-confidence-score/internal/config"
-	"release-confidence-score/internal/shared"
+	"release-confidence-score/internal/git/types"
 
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
@@ -27,7 +27,7 @@ const (
 var urlRegex = regexp.MustCompile(`(?m)^- (https?://\S+)$`)
 
 // GetDiffURLsAndUserGuidance fetches merge request notes and extracts diff URLs and user guidance
-func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, cfg *config.Config, mergeRequestIID int) ([]string, []shared.UserGuidance, error) {
+func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, cfg *config.Config, mergeRequestIID int) ([]string, []types.UserGuidance, error) {
 	notes, err := getAllMergeRequestNotes(client, mergeRequestIID)
 	if err != nil {
 		return nil, nil, err
@@ -99,14 +99,14 @@ func extractDiffURLsFromBot(notes []*gitlabapi.Note) ([]string, error) {
 }
 
 // extractUserGuidance extracts user guidance from merge request notes with full metadata
-func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitlabapi.Note) []shared.UserGuidance {
-	var allGuidance []shared.UserGuidance
+func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitlabapi.Note) []types.UserGuidance {
+	var allGuidance []types.UserGuidance
 
 	// Build the merge request URL from config
 	mrURL := fmt.Sprintf("%s/%s/-/merge_requests/%d", cfg.GitLabBaseURL, projectID, mergeRequestIID)
 
 	for _, note := range notes {
-		guidanceContent, found := shared.ParseUserGuidance(note.Body)
+		guidanceContent, found := types.ParseUserGuidance(note.Body)
 		if !found {
 			continue
 		}
@@ -117,7 +117,7 @@ func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitla
 			continue
 		}
 
-		guidance := shared.UserGuidance{
+		guidance := types.UserGuidance{
 			Content:      guidanceContent,
 			Author:       note.Author.Username,
 			Date:         *note.CreatedAt,
@@ -130,4 +130,18 @@ func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitla
 	}
 
 	return allGuidance
+}
+
+// PostReportToMR posts the release confidence score report to a GitLab merge request
+func PostReportToMR(client *gitlabapi.Client, report string, mrIID int) error {
+	opts := &gitlabapi.CreateMergeRequestNoteOptions{
+		Body: &report,
+	}
+
+	_, _, err := client.Notes.CreateMergeRequestNote(projectID, mrIID, opts)
+	if err != nil {
+		return fmt.Errorf("failed to post comment to MR: %w", err)
+	}
+
+	return nil
 }

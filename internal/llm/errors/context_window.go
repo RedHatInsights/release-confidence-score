@@ -1,4 +1,4 @@
-package llm
+package errors
 
 import (
 	"fmt"

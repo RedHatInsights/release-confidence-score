@@ -1,57 +1,62 @@
-Analyze this GitLab merge request for production release confidence and respond with structured JSON:
+Analyze these code changes for production release confidence and respond with structured JSON:
 
 ## Code Changes
 {{.Diff}}
 
-{{if .TruncationMetadata}}
-### ⚠️ Analysis Limitations
-Due to diff size, some patches were truncated to fit context window:
-- **Truncation level**: {{.TruncationMetadata.Level}}
-- **Files fully analyzed**: {{.TruncationMetadata.FilesPreserved}}/{{.TruncationMetadata.TotalFiles}}
-- **Files with truncated patches**: {{.TruncationMetadata.FilesTruncated}} (primarily low-risk files like tests/docs)
-- **Critical/security files**: fully preserved
-- **All file metadata** (names, change stats): preserved for complete risk assessment
+{{- if .TruncationMetadata}}
+### ⚠️ Truncation Applied
+**Level**: {{.TruncationMetadata.Level}} | **Preserved**: {{.TruncationMetadata.FilesPreserved}}/{{.TruncationMetadata.TotalFiles}} files | **Truncated**: {{.TruncationMetadata.FilesTruncated}} files
 
-**How to identify truncated patches**: Look for the marker `... [TRUNCATED: ~N lines removed for brevity] ...` within a file's diff. When you see this, the patch shows only the beginning and end of the changes - the middle portion was removed to save space.
+Patches truncated to fit context limits. Look for `[N lines omitted]` markers in diffs.
+- **All metadata preserved**: filenames, change counts, commits, authors, PR/MR numbers, QE labels
+- **Critical files** (DB, security, APIs) preserved completely at lower levels; low-risk files (tests, docs) truncated first
+- **Patch edges preserved**: You see the beginning and end of each change, middle sections omitted
 
-Despite truncation, you still have comprehensive information about all changes. Use the file metadata, preserved critical code, and beginning/end context from truncated patches to perform a thorough risk analysis.
+Analyze using the preserved context at patch boundaries combined with file metadata.
 
-{{end}}
-{{if .UserGuidance}}
+{{- end}}
+
+{{- if .UserGuidance}}
 ## Additional Analysis Guidance
-The following guidance was provided in the merge request comments to guide your analysis:
+The following guidance was provided to guide your analysis:
 
-{{range .UserGuidance}}- {{.}}
-{{end}}
+{{- range .UserGuidance}}
+- {{.}}
+{{- end}}
+
 Please incorporate this guidance into your analysis.
 
-{{end}}
-{{if .QETesting}}
+{{- end}}
+{{- define "qeCommitList"}}
+{{- range .}}
+**Repository**: {{.RepoURL}}
+{{- range .Commits}}
+- {{.}}
+{{- end}}
+{{- end}}
+{{- end}}
+
+{{- if .QETesting}}
 ## QE Testing Status
 
-{{if .QETesting.Tested}}
+{{- if .QETesting.Tested}}
 ### QE Tested Commits
-{{range .QETesting.Tested}}
-**Repository**: {{.RepoURL}}
-{{range .Commits}}- {{.}}
-{{end}}
-{{end}}
-{{end}}
-{{if .QETesting.NeedsTesting}}
+{{- template "qeCommitList" .QETesting.Tested}}
+{{- end}}
+
+{{- if .QETesting.NeedsTesting}}
 ### Needs QE Testing Commits
-{{range .QETesting.NeedsTesting}}
-**Repository**: {{.RepoURL}}
-{{range .Commits}}- {{.}}
-{{end}}
-{{end}}
-{{end}}
+{{- template "qeCommitList" .QETesting.NeedsTesting}}
+{{- end}}
+
 *Evaluate confidence impact based on testing status and the criticality of each change.*
 
-{{end}}
-{{if .Documentation}}
+{{- end}}
 
+{{- if .Documentation}}
 ## Documentation
 {{.Documentation}}
 
-{{end}}
+{{- end}}
+
 Provide your analysis in the exact JSON format specified in the system prompt. Include all required fields and ensure the JSON is valid.

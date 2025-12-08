@@ -4,34 +4,34 @@ services:
     env_file: .env
     environment:
       # GitHub configuration
-      - GITHUB_TOKEN
+      - RCS_GITHUB_TOKEN
       # GitLab configuration
-      - GITLAB_BASE_URL
-      - GITLAB_SKIP_SSL_VERIFY
-      - GITLAB_TOKEN
+      - RCS_GITLAB_BASE_URL
+      - RCS_GITLAB_SKIP_SSL_VERIFY
+      - RCS_GITLAB_TOKEN
       # Logging configuration
-      - LOG_FORMAT
-      - LOG_LEVEL
+      - RCS_LOG_FORMAT
+      - RCS_LOG_LEVEL
       # Model selection (claude, gemini or llama)
-      - MODEL_PROVIDER
+      - RCS_MODEL_PROVIDER
       # Claude configuration
-      - CLAUDE_MODEL_API
-      - CLAUDE_MODEL_ID
-      - CLAUDE_USER_KEY
+      - RCS_CLAUDE_MODEL_API
+      - RCS_CLAUDE_MODEL_ID
+      - RCS_CLAUDE_USER_KEY
       # Gemini configuration
-      - GEMINI_MODEL_API
-      - GEMINI_MODEL_ID
-      - GEMINI_USER_KEY
+      - RCS_GEMINI_MODEL_API
+      - RCS_GEMINI_MODEL_ID
+      - RCS_GEMINI_USER_KEY
       # Llama configuration
-      - LLAMA_MODEL_API
-      - LLAMA_MODEL_ID
-      - LLAMA_USER_KEY
+      - RCS_LLAMA_MODEL_API
+      - RCS_LLAMA_MODEL_ID
+      - RCS_LLAMA_USER_KEY
       # Additional model configuration
-      - MODEL_MAX_RESPONSE_TOKENS
-      - MODEL_SKIP_SSL_VERIFY
-      - MODEL_TIMEOUT_SECONDS
+      - RCS_MODEL_MAX_RESPONSE_TOKENS
+      - RCS_MODEL_SKIP_SSL_VERIFY
+      - RCS_MODEL_TIMEOUT_SECONDS
       # System prompt version
-      - SYSTEM_PROMPT_VERSION
+      - RCS_SYSTEM_PROMPT_VERSION
       # Scoring thresholds
-      - SCORE_THRESHOLD_AUTO_DEPLOY
-      - SCORE_THRESHOLD_REVIEW_REQUIRED
+      - RCS_SCORE_THRESHOLD_AUTO_DEPLOY
+      - RCS_SCORE_THRESHOLD_REVIEW_REQUIRED

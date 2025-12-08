@@ -6,29 +6,30 @@ import (
 	"time"
 
 	"release-confidence-score/internal/app_interface"
-	"release-confidence-score/internal/changelog"
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/github"
 	"release-confidence-score/internal/git/gitlab"
-	"release-confidence-score/internal/llm"
+	"release-confidence-score/internal/git/shared"
+	"release-confidence-score/internal/git/types"
+	llmerrors "release-confidence-score/internal/llm/errors"
+	"release-confidence-score/internal/llm/formatting"
+	"release-confidence-score/internal/llm/prompts/user"
 	"release-confidence-score/internal/llm/providers"
-	"release-confidence-score/internal/qe"
+	"release-confidence-score/internal/llm/truncation"
 	"release-confidence-score/internal/report"
-	"release-confidence-score/internal/shared"
 
-	githubapi "github.com/google/go-github/v79/github"
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
 
 type ReleaseAnalyzer struct {
-	githubClient *githubapi.Client
-	gitlabClient *gitlabapi.Client
-	llmClient    llm.LLMClient
-	config       *config.Config
+	githubProvider types.GitProvider
+	gitlabProvider types.GitProvider
+	gitlabClient   *gitlabapi.Client // Still needed for app_interface.GetDiffURLsAndUserGuidance
+	llmClient      providers.LLMClient
+	config         *config.Config
 }
 
 func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
-
 	githubClient := github.NewClient(cfg)
 	gitlabClient := gitlab.NewClient(cfg)
 
@@ -38,35 +39,48 @@ func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 	}
 
 	return &ReleaseAnalyzer{
-		githubClient: githubClient,
-		gitlabClient: gitlabClient,
-		llmClient:    llmClient,
-		config:       cfg,
+		githubProvider: github.NewFetcher(githubClient, cfg),
+		gitlabProvider: gitlab.NewFetcher(gitlabClient, cfg),
+		gitlabClient:   gitlabClient, // Keep for app_interface package
+		llmClient:      llmClient,
+		config:         cfg,
 	}, nil
 }
 
-func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int) (float64, string, error) {
+func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int, postToMR bool) (float64, string, error) {
 	slog.Debug("Starting release analysis in app-interface mode")
 
-	// Phase 1: Fetch all data
 	// Get diff URLs and user guidance from merge request notes
 	diffURLs, appInterfaceGuidance, err := app_interface.GetDiffURLsAndUserGuidance(ra.gitlabClient, ra.config, mergeRequestIID)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to get release data from app-interface: %w", err)
 	}
 
-	// Fetch raw release data from GitHub
-	changelogs, githubGuidance, documentation, comparisons, err := GetReleaseData(ra.githubClient, ra.config, diffURLs)
+	// Fetch raw release data from GitHub and/or GitLab
+	comparisons, gitGuidance, documentation, err := ra.getReleaseData(diffURLs)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to fetch release data: %w", err)
 	}
 
-	// Merge user guidance from GitLab and GitHub sources
-	allUserGuidance := make([]shared.UserGuidance, 0, len(appInterfaceGuidance)+len(githubGuidance))
-	allUserGuidance = append(allUserGuidance, appInterfaceGuidance...)
-	allUserGuidance = append(allUserGuidance, githubGuidance...)
+	// Merge user guidance from app-interface MR and Git sources
+	allGuidance := make([]types.UserGuidance, 0, len(appInterfaceGuidance)+len(gitGuidance))
+	allGuidance = append(allGuidance, appInterfaceGuidance...)
+	allGuidance = append(allGuidance, gitGuidance...)
 
-	return ra.analyze(changelogs, allUserGuidance, documentation, comparisons)
+	score, reportText, err := ra.analyze(comparisons, allGuidance, documentation)
+	if err != nil {
+		return 0, "", err
+	}
+
+	// Post report to MR if requested
+	if postToMR {
+		if err := app_interface.PostReportToMR(ra.gitlabClient, reportText, mergeRequestIID); err != nil {
+			return 0, "", fmt.Errorf("failed to post report to MR: %w", err)
+		}
+		slog.Info("Report posted to merge request", "mr_iid", mergeRequestIID)
+	}
+
+	return score, reportText, nil
 }
 
 // AnalyzeStandalone performs release analysis using compare URLs directly (standalone mode)
@@ -77,53 +91,216 @@ func (ra *ReleaseAnalyzer) AnalyzeStandalone(compareURLs []string) (float64, str
 		return 0, "", fmt.Errorf("no compare URLs provided")
 	}
 
-	// Fetch raw release data from GitHub
-	changelogs, githubGuidance, documentation, comparisons, err := GetReleaseData(ra.githubClient, ra.config, compareURLs)
+	// Fetch raw release data from GitHub and/or GitLab
+	comparisons, gitGuidance, documentation, err := ra.getReleaseData(compareURLs)
 	if err != nil {
 		return 0, "", fmt.Errorf("failed to fetch release data: %w", err)
 	}
 
-	return ra.analyze(changelogs, githubGuidance, documentation, comparisons)
+	return ra.analyze(comparisons, gitGuidance, documentation)
 }
 
-// analyzeRelease is the common analysis logic used by both modes
-func (ra *ReleaseAnalyzer) analyze(
-	changelogs []*changelog.Changelog,
-	userGuidance []shared.UserGuidance,
-	documentation []*github.RepoDocumentation,
-	comparisons []*github.CompareData,
-) (float64, string, error) {
-	// Process QE testing labels from changelogs
-	qeTestingCommits := qe.BuildTestingCommits(changelogs)
+// getReleaseData fetches raw release data from multiple compare URLs (GitHub or GitLab)
+// Returns: comparisons, user guidance, documentation, error
+func (ra *ReleaseAnalyzer) getReleaseData(urls []string) ([]*types.Comparison, []types.UserGuidance, []*types.Documentation, error) {
+	if len(urls) == 0 {
+		return []*types.Comparison{}, []types.UserGuidance{}, []*types.Documentation{}, nil
+	}
 
-	// Phases 2-4: Format data, submit prompt, and handle truncation retries
-	// This is handled internally by AnalyzeWithProgressiveTruncation
-	response, truncationInfo, err := llm.AnalyzeWithProgressiveTruncation(
-		ra.llmClient, comparisons, documentation, userGuidance, qeTestingCommits)
+	// Deduplicate URLs while preserving order
+	uniqueURLs := make([]string, 0, len(urls))
+	seen := make(map[string]bool)
+	duplicateCount := 0
+
+	for _, url := range urls {
+		if !seen[url] {
+			seen[url] = true
+			uniqueURLs = append(uniqueURLs, url)
+		} else {
+			duplicateCount++
+		}
+	}
+
+	if duplicateCount > 0 {
+		slog.Info("Deduplicated compare URLs", "total", len(urls), "unique", len(uniqueURLs), "duplicates_removed", duplicateCount)
+	}
+
+	var comparisons []*types.Comparison
+	var allUserGuidance []types.UserGuidance
+	var documentation []*types.Documentation
+
+	for _, url := range uniqueURLs {
+		// Detect which provider to use based on URL
+		var provider types.GitProvider
+
+		switch {
+		case ra.githubProvider.IsCompareURL(url):
+			provider = ra.githubProvider
+		case ra.gitlabProvider.IsCompareURL(url):
+			provider = ra.gitlabProvider
+		default:
+			slog.Warn("Skipping unsupported URL", "url", url)
+			continue
+		}
+
+		platformName := provider.Name()
+		slog.Debug("Fetching data", "platform", platformName, "url", url)
+
+		// Fetch all release data (comparison with enriched commits, user guidance, documentation)
+		comparison, userGuidance, docs, err := provider.FetchReleaseData(url)
+		if err != nil {
+			slog.Error("Error fetching data", "platform", platformName, "error", err, "url", url)
+			continue
+		}
+
+		// Collect comparison if available
+		if comparison != nil {
+			slog.Debug("Collected comparison",
+				"platform", platformName,
+				"commit_count", len(comparison.Commits),
+				"file_count", len(comparison.Files))
+			comparisons = append(comparisons, comparison)
+		} else {
+			slog.Warn("No comparison data received", "platform", platformName)
+		}
+
+		// Collect user guidance
+		if len(userGuidance) > 0 {
+			slog.Debug("Collected user guidance",
+				"platform", platformName,
+				"count", len(userGuidance))
+			allUserGuidance = append(allUserGuidance, userGuidance...)
+		}
+
+		// Collect documentation if available
+		if docs != nil && docs.MainDocFile != "" {
+			slog.Debug("Collected documentation",
+				"platform", platformName,
+				"repo_url", docs.Repository.URL,
+				"entry_point", docs.MainDocFile)
+			documentation = append(documentation, docs)
+		}
+	}
+
+	return comparisons, allUserGuidance, documentation, nil
+}
+
+// analyze is the common analysis logic used by both modes
+func (ra *ReleaseAnalyzer) analyze(
+	comparisons []*types.Comparison,
+	userGuidance []types.UserGuidance,
+	documentation []*types.Documentation,
+) (float64, string, error) {
+	// Process QE testing labels from comparisons
+	qeTestingCommits := shared.BuildTestingCommits(comparisons)
+
+	// Analyze with progressive truncation retry
+	response, truncationInfo, err := ra.analyzeWithProgressiveTruncation(
+		comparisons, documentation, userGuidance, qeTestingCommits)
 	if err != nil {
 		return 0, "", err
 	}
 
 	// Phase 5: Render template and return report and score
-	// Parse the structured JSON response
-	analysis, err := report.ParseStructuredResponse(response)
-	if err != nil {
-		return 0, "", fmt.Errorf("failed to parse structured response: %w", err)
+	// Build report configuration
+	reportConfig := &report.ReportConfig{
+		LLMResponse: response,
+		Metadata: &report.ReportMetadata{
+			ModelID:        ra.config.ModelID,
+			GenerationTime: time.Now(),
+		},
+		Comparisons:             comparisons,
+		Documentation:           documentation,
+		UserGuidance:            userGuidance,
+		TruncationInfo:          truncationInfo,
+		AutoDeployThreshold:     ra.config.ScoreThresholds.AutoDeploy,
+		ReviewRequiredThreshold: ra.config.ScoreThresholds.ReviewRequired,
 	}
 
-	// Build metadata for template processing
-	reportMetadata := &report.ReportMetadata{
-		ModelID:        ra.config.ModelID,
-		GenerationTime: time.Now(),
-	}
-
-	// Process the analysis into final report using embedded template
-	finalReport, err := report.ProcessAnalysis(analysis, reportMetadata, changelogs, documentation, userGuidance,
-		truncationInfo, ra.config.ScoreThresholds.AutoDeploy, ra.config.ScoreThresholds.ReviewRequired)
+	// Generate the final report and extract score
+	score, finalReport, err := report.GenerateReport(reportConfig)
 	if err != nil {
-		return 0, "", fmt.Errorf("failed to process analysis into report: %w", err)
+		return 0, "", fmt.Errorf("failed to generate report: %w", err)
 	}
 
 	// Return the structured score and processed report
-	return float64(analysis.Score), finalReport, nil
+	return float64(score), finalReport, nil
+}
+
+// analyzeWithProgressiveTruncation performs LLM analysis with automatic retry using progressive truncation
+// Returns the LLM response, truncation metadata (nil if no truncation), and any error
+func (ra *ReleaseAnalyzer) analyzeWithProgressiveTruncation(
+	comparisons []*types.Comparison,
+	documentation []*types.Documentation,
+	allUserGuidance []types.UserGuidance,
+	qeTestingCommits *shared.TestingCommits,
+) (string, *truncation.TruncationMetadata, error) {
+	// Format data and prepare initial prompt
+	diffContent := formatting.FormatComparisons(comparisons)
+	documentationText := formatting.FormatDocumentations(documentation)
+
+	userPrompt, err := user.RenderUserPrompt(diffContent, documentationText, allUserGuidance, qeTestingCommits, truncation.TruncationMetadata{})
+	if err != nil {
+		return "", nil, fmt.Errorf("failed to format initial user prompt: %w", err)
+	}
+
+	// Try with full diff first
+	response, err := ra.llmClient.Analyze(userPrompt)
+	if err == nil {
+		return response, nil, nil
+	}
+
+	// Check if this is a context window error
+	contextErr, ok := err.(*llmerrors.ContextWindowError)
+	if !ok {
+		return "", nil, fmt.Errorf("failed to analyze merge request: %w", err)
+	}
+
+	// Retry with progressive truncation
+	slog.Warn("Context window exceeded, retrying with progressive truncation",
+		"provider", contextErr.Provider,
+		"status_code", contextErr.StatusCode)
+
+	truncationLevels := []string{
+		truncation.LevelLow,
+		truncation.LevelModerate,
+		truncation.LevelHigh,
+		truncation.LevelExtreme,
+	}
+
+	for _, levelName := range truncationLevels {
+		slog.Info("Attempting analysis with truncation", "level", levelName)
+
+		// Truncate diffs and documentation at the same level
+		truncatedComparisons, combinedMetadata := truncation.TruncateMultipleComparisons(comparisons, levelName)
+		truncatedDocs := truncation.TruncateDocumentation(documentation, levelName)
+
+		// Format truncated comparisons and documentation
+		truncatedDiff := formatting.FormatComparisons(truncatedComparisons)
+		truncatedDocText := formatting.FormatDocumentations(truncatedDocs)
+
+		userPrompt, promptErr := user.RenderUserPrompt(truncatedDiff, truncatedDocText, allUserGuidance, qeTestingCommits, combinedMetadata)
+		if promptErr != nil {
+			return "", nil, fmt.Errorf("failed to format user prompt with %s truncation: %w", levelName, promptErr)
+		}
+
+		// Retry analysis with truncated prompt
+		response, err = ra.llmClient.Analyze(userPrompt)
+		if err != nil {
+			// Check if still a context window error
+			if _, isContextErr := err.(*llmerrors.ContextWindowError); isContextErr {
+				slog.Warn("Context window still exceeded with truncation", "level", levelName)
+				continue
+			}
+			// Different error - fail immediately
+			return "", nil, fmt.Errorf("failed to analyze merge request with %s truncation: %w", levelName, err)
+		}
+
+		// Success!
+		slog.Info("Analysis succeeded with truncation", "level", levelName)
+		return response, &combinedMetadata, nil
+	}
+
+	// Exhausted all truncation levels
+	return "", nil, fmt.Errorf("failed to analyze merge request even with extreme truncation: %w", err)
 }

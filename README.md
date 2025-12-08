@@ -64,13 +64,13 @@ Whether you're making manual release decisions or using automated gates in your 
 
 2. **Set environment variables**
    ```bash
-   export GITHUB_TOKEN="your_github_token"
-   export GITLAB_BASE_URL="https://gitlab.cee.redhat.com/"
-   export GITLAB_TOKEN="your_gitlab_token"
-   export MODEL_PROVIDER="claude" # or gemini, llama
-   export CLAUDE_MODEL_API="your_claude_api_endpoint"
-   export CLAUDE_MODEL_ID="claude-sonnet-4@20250514"
-   export CLAUDE_USER_KEY="your_claude_api_key"
+   export RCS_GITHUB_TOKEN="your_github_token"
+   export RCS_GITLAB_BASE_URL="https://gitlab.cee.redhat.com/"
+   export RCS_GITLAB_TOKEN="your_gitlab_token"
+   export RCS_MODEL_PROVIDER="claude" # or gemini, llama
+   export RCS_CLAUDE_MODEL_API="your_claude_api_endpoint"
+   export RCS_CLAUDE_MODEL_ID="claude-sonnet-4@20250514"
+   export RCS_CLAUDE_USER_KEY="your_claude_api_key"
    ```
 
 3. **Run the application**
@@ -88,45 +88,45 @@ Whether you're making manual release decisions or using automated gates in your 
 ### Required Environment Variables
 
 **GitHub Integration:**
-- `GITHUB_TOKEN`: GitHub personal access token.
+- `RCS_GITHUB_TOKEN`: GitHub personal access token.
 
 **GitLab Configuration:**
-- `GITLAB_BASE_URL`: GitLab instance URL.
-- `GITLAB_TOKEN`: GitLab personal access token.
+- `RCS_GITLAB_BASE_URL`: GitLab instance URL.
+- `RCS_GITLAB_TOKEN`: GitLab personal access token.
 
 **Provider-Specific Configuration:**
 
 For Claude (default):
-- `CLAUDE_MODEL_API`: Claude API endpoint.
-- `CLAUDE_MODEL_ID`: Model identifier (e.g., `claude-sonnet-4@20250514`).
-- `CLAUDE_USER_KEY`: Authentication key.
+- `RCS_CLAUDE_MODEL_API`: Claude API endpoint.
+- `RCS_CLAUDE_MODEL_ID`: Model identifier (e.g., `claude-sonnet-4@20250514`).
+- `RCS_CLAUDE_USER_KEY`: Authentication key.
 
 For Gemini:
-- `GEMINI_MODEL_API`: Gemini API endpoint.
-- `GEMINI_MODEL_ID`: Model identifier (e.g., `gemini-2.5-pro`).
-- `GEMINI_USER_KEY`: Authentication key.
+- `RCS_GEMINI_MODEL_API`: Gemini API endpoint.
+- `RCS_GEMINI_MODEL_ID`: Model identifier (e.g., `gemini-2.5-pro`).
+- `RCS_GEMINI_USER_KEY`: Authentication key.
 
 For Llama:
-- `LLAMA_MODEL_API`: Llama API endpoint.
-- `LLAMA_MODEL_ID`: Model identifier (e.g., `RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic`).
-- `LLAMA_USER_KEY`: Authentication key.
+- `RCS_LLAMA_MODEL_API`: Llama API endpoint.
+- `RCS_LLAMA_MODEL_ID`: Model identifier (e.g., `RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic`).
+- `RCS_LLAMA_USER_KEY`: Authentication key.
 
 ### Optional Environment Variables
 
 **AI Provider Selection:**
-- `MODEL_PROVIDER`: Choose `claude` (default), `gemini`, or `llama`.
+- `RCS_MODEL_PROVIDER`: Choose `claude` (default), `gemini`, or `llama`.
 
 **Model Configuration:**
-- `MODEL_SKIP_SSL_VERIFY`: Skip SSL verification for AI provider (default: false).
-- `MODEL_MAX_RESPONSE_TOKENS`: Maximum tokens in AI response (default: 2000).
-- `MODEL_TIMEOUT_SECONDS`: Request timeout in seconds (default: 120).
+- `RCS_MODEL_SKIP_SSL_VERIFY`: Skip SSL verification for AI provider (default: false).
+- `RCS_MODEL_MAX_RESPONSE_TOKENS`: Maximum tokens in AI response (default: 2000).
+- `RCS_MODEL_TIMEOUT_SECONDS`: Request timeout in seconds (default: 120).
 
 **GitLab Configuration:**
-- `GITLAB_SKIP_SSL_VERIFY`: Skip SSL verification (default: false).
+- `RCS_GITLAB_SKIP_SSL_VERIFY`: Skip SSL verification (default: false).
 
 **Score Thresholds:**
-- `SCORE_THRESHOLD_AUTO_DEPLOY`: Minimum score for auto-deployment recommendation (default: 80).
-- `SCORE_THRESHOLD_REVIEW_REQUIRED`: Minimum score before manual review required (default: 60).
+- `RCS_SCORE_THRESHOLD_AUTO_DEPLOY`: Minimum score for auto-deployment recommendation (default: 80).
+- `RCS_SCORE_THRESHOLD_REVIEW_REQUIRED`: Minimum score before manual review required (default: 60).
 
 See `.env.example` for a complete configuration template.
 
