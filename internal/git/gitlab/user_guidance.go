@@ -3,14 +3,10 @@ package gitlab
 import (
 	"fmt"
 	"log/slog"
-	"regexp"
-	"strings"
 
 	"gitlab.com/gitlab-org/api/client-go"
 	"release-confidence-score/internal/git/types"
 )
-
-var rcsBlockRegex = regexp.MustCompile(`(?s)/rcs\s+(.*?)\s+/rcs`)
 
 // FetchUserGuidance extracts user guidance from all MRs in the comparison
 func FetchUserGuidance(client *gitlab.Client, projectPath string, comparison *types.Comparison) ([]types.UserGuidance, error) {
@@ -88,9 +84,9 @@ func extractUserGuidance(client *gitlab.Client, projectPath string, mr *gitlab.M
 			continue
 		}
 
-		// Extract /rcs blocks from note body
-		matches := rcsBlockRegex.FindAllStringSubmatch(note.Body, -1)
-		if len(matches) == 0 {
+		// Extract user guidance using shared parser
+		guidanceContent, found := types.ParseUserGuidance(note.Body)
+		if !found {
 			continue
 		}
 
@@ -101,27 +97,16 @@ func extractUserGuidance(client *gitlab.Client, projectPath string, mr *gitlab.M
 		}
 		isAuthorized := isAuthorized(note.Author.Username, mrAuthor, approvers)
 
-		for _, match := range matches {
-			if len(match) < 2 {
-				continue
-			}
-
-			content := strings.TrimSpace(match[1])
-			if content == "" {
-				continue
-			}
-
-			guidance := types.UserGuidance{
-				Content:      content,
-				Author:       note.Author.Username,
-				Date:         *note.CreatedAt,
-				CommentURL:   "", // GitLab notes don't have direct URLs in the API
-				IsAuthorized: isAuthorized,
-			}
-
-			slog.Debug("Found user guidance in MR note", "mr_iid", mrIID, "author", note.Author.Username, "authorized", isAuthorized)
-			allGuidance = append(allGuidance, guidance)
+		guidance := types.UserGuidance{
+			Content:      guidanceContent,
+			Author:       note.Author.Username,
+			Date:         *note.CreatedAt,
+			CommentURL:   "", // GitLab notes don't have direct URLs in the API
+			IsAuthorized: isAuthorized,
 		}
+
+		slog.Debug("Found user guidance in MR note", "mr_iid", mrIID, "author", note.Author.Username, "authorized", isAuthorized)
+		allGuidance = append(allGuidance, guidance)
 	}
 
 	return allGuidance, nil
