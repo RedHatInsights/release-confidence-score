@@ -194,8 +194,9 @@ See `.env.example` for a complete configuration template.
 
 Automatically handles large diffs that exceed AI context windows using progressive truncation:
 - **First attempt**: Analyzes full diff content without any truncation.
-- **Progressive retry**: If context window is exceeded, automatically retries with increasing truncation levels (moderate → aggressive → extreme → ultimate).
+- **Progressive retry**: If context window is exceeded, automatically retries with increasing truncation levels (low → moderate → high → extreme).
 - **Risk-based preservation**: Prioritizes critical files (database migrations, security code, API contracts, infrastructure) while truncating low-risk files (tests, documentation, generated files).
+- **Small file protection**: Files below size thresholds are never truncated (100/75/50/20 lines for low/moderate/high/extreme levels).
 - **Transparent reporting**: Reports truncation level and impact in the final analysis.
 
 ### Repository Documentation Integration
