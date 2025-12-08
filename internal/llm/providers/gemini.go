@@ -2,7 +2,6 @@ package providers
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,10 +10,9 @@ import (
 	"time"
 
 	"release-confidence-score/internal/config"
-	"release-confidence-score/internal/llm"
+	httputil "release-confidence-score/internal/http"
+	llmerrors "release-confidence-score/internal/llm/errors"
 	"release-confidence-score/internal/llm/prompts/system"
-	"release-confidence-score/internal/logger"
-	"release-confidence-score/internal/shared"
 )
 
 type GeminiClient struct {
@@ -48,7 +46,7 @@ type GeminiUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-func NewGemini(cfg *config.Config) llm.LLMClient {
+func NewGemini(cfg *config.Config) LLMClient {
 	return &GeminiClient{config: cfg}
 }
 
@@ -64,7 +62,7 @@ func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
 			Role:    "user",
 			Content: combinedPrompt,
 		}},
-		MaxTokens:   cfg.MaxResponseTokens,
+		MaxTokens:   cfg.ModelMaxResponseTokens,
 		Temperature: 0,
 	}
 
@@ -73,7 +71,7 @@ func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
 		return "", fmt.Errorf("marshal request: %w", err)
 	}
 
-	slog.Log(context.Background(), logger.LevelTrace, "Gemini API request", "request", jsonData)
+	slog.Debug("Gemini API request", "request", jsonData)
 
 	url := cfg.ModelAPI + "/v1beta/openai/chat/completions"
 	httpReq, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
@@ -82,10 +80,10 @@ func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.UserKey)
+	httpReq.Header.Set("Authorization", "Bearer "+cfg.ModelUserKey)
 
-	httpClient := shared.NewHTTPClient(shared.HTTPClientOptions{
-		Timeout:       time.Duration(cfg.TimeoutSeconds) * time.Second,
+	httpClient := httputil.NewHTTPClient(httputil.HTTPClientOptions{
+		Timeout:       time.Duration(cfg.ModelTimeoutSeconds) * time.Second,
 		SkipSSLVerify: cfg.ModelSkipSSLVerify,
 	})
 
@@ -104,8 +102,8 @@ func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
 
 	if resp.StatusCode != http.StatusOK {
 		// Check if this is a context window error
-		if llm.IsContextWindowError(resp.StatusCode, body) {
-			return "", &llm.ContextWindowError{
+		if llmerrors.IsContextWindowError(resp.StatusCode, body) {
+			return "", &llmerrors.ContextWindowError{
 				StatusCode: resp.StatusCode,
 				Message:    string(body),
 				Provider:   "Gemini",
@@ -123,7 +121,7 @@ func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
 		return "", fmt.Errorf("no choices in response")
 	}
 
-	slog.Log(context.Background(), logger.LevelTrace, "Gemini API response", "response", response)
+	slog.Debug("Gemini API response", "response", response)
 
 	slog.Debug("Gemini API token usage",
 		"input_tokens", response.Usage.PromptTokens,

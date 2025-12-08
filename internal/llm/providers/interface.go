@@ -1,4 +1,4 @@
-package llm
+package providers
 
 // LLMClient interface for all LLM providers
 type LLMClient interface {

@@ -1,4 +1,4 @@
-package shared
+package http
 
 import (
 	"crypto/tls"

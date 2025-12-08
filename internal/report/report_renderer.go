@@ -10,13 +10,126 @@ import (
 	"text/template"
 	"time"
 
-	"release-confidence-score/internal/changelog"
-	githubpkg "release-confidence-score/internal/git/github"
-	"release-confidence-score/internal/shared"
+	"release-confidence-score/internal/git/types"
+	"release-confidence-score/internal/llm/truncation"
 )
 
 //go:embed report_template.md
-var reportTemplate string
+var reportTemplateText string
+
+var reportTemplate *template.Template
+
+func init() {
+	reportTemplate = template.Must(
+		template.New("report").Funcs(templateFuncs()).Parse(reportTemplateText),
+	)
+}
+
+// templateFuncs returns all custom template functions
+func templateFuncs() template.FuncMap {
+	return template.FuncMap{
+		"hasPrefix":           strings.HasPrefix,
+		"contains":            strings.Contains,
+		"escapePipes":         escapePipes,
+		"qeStatus":            qeStatus,
+		"authorizationStatus": authorizationStatus,
+		"prLink":              prLink,
+		"formatAuthor":        formatAuthor,
+		"docURL":              docURL,
+		"commitLink":          commitLink,
+		"formatDate":          formatDate,
+		"docFileInfo":         docFileInfo,
+	}
+}
+
+// Template helper functions
+
+func escapePipes(s string) string {
+	return strings.ReplaceAll(s, "|", "\\|")
+}
+
+func qeStatus(label string) string {
+	switch label {
+	case "qe-tested":
+		return "✅ Tested"
+	case "needs-qe-testing":
+		return "⚠️ Needs Testing"
+	default:
+		return "N/A"
+	}
+}
+
+func authorizationStatus(isAuthorized bool) string {
+	if isAuthorized {
+		return "✅ Authorized"
+	}
+	return "❌ Unauthorized"
+}
+
+func prLink(prNumber int, repoURL string) string {
+	if prNumber > 0 {
+		return fmt.Sprintf("[#%d](%s/pull/%d)", prNumber, repoURL, prNumber)
+	}
+	return "N/A"
+}
+
+func formatAuthor(author, commentURL string) string {
+	if strings.Contains(commentURL, "github.com") {
+		return fmt.Sprintf("[@%s](https://github.com/%s)", author, author)
+	}
+	return "@" + author
+}
+
+func docURL(filename, repoURL, branch string) string {
+	if strings.HasPrefix(filename, "http") {
+		return filename
+	}
+	return fmt.Sprintf("%s/blob/%s/%s", repoURL, branch, filename)
+}
+
+func commitLink(shortSHA, fullSHA, repoURL string) string {
+	return fmt.Sprintf("[%s](%s/commit/%s)", shortSHA, repoURL, fullSHA)
+}
+
+func formatDate(t time.Time) string {
+	return t.Format("2006-01-02 15:04")
+}
+
+func docFileInfo(filename, repoURL, branch, content string) string {
+	url := docURL(filename, repoURL, branch)
+	return fmt.Sprintf("- %s - %d chars", url, len(content))
+}
+
+// stripMarkdownCodeBlocks removes markdown code block markers from LLM responses
+// Handles both ```json and ``` style code blocks
+func stripMarkdownCodeBlocks(content string) string {
+	trimmed := strings.TrimSpace(content)
+
+	// Return as-is if not wrapped in code blocks
+	if !strings.HasPrefix(trimmed, "```") {
+		return trimmed
+	}
+
+	// Remove opening marker (```json or ``` followed by newline)
+	if idx := strings.Index(trimmed, "\n"); idx != -1 {
+		trimmed = trimmed[idx+1:]
+	}
+
+	// Remove closing marker
+	trimmed = strings.TrimSuffix(trimmed, "```")
+
+	return strings.TrimSpace(trimmed)
+}
+
+func getReleaseRecommendation(score, autoDeployThreshold, reviewRequiredThreshold int) string {
+	if score >= autoDeployThreshold {
+		return "✅ RECOMMENDED FOR RELEASE"
+	} else if score >= reviewRequiredThreshold {
+		return "⚠️ MANUAL REVIEW REQUIRED"
+	} else {
+		return "🚫 RELEASE NOT RECOMMENDED"
+	}
+}
 
 // StructuredAnalysis represents the LLM's analysis output in a structured format
 type StructuredAnalysis struct {
@@ -54,102 +167,64 @@ type ReportMetadata struct {
 	GenerationTime time.Time
 }
 
+// ReportConfig holds all configuration and data needed for report generation
+type ReportConfig struct {
+	LLMResponse             string
+	Metadata                *ReportMetadata
+	Comparisons             []*types.Comparison
+	Documentation           []*types.Documentation
+	UserGuidance            []types.UserGuidance
+	TruncationInfo          *truncation.TruncationMetadata
+	AutoDeployThreshold     int
+	ReviewRequiredThreshold int
+}
+
 // TemplateData holds all data needed for template rendering
 type TemplateData struct {
 	Analysis              *StructuredAnalysis
 	Metadata              *ReportMetadata
-	ChangelogContent      string
-	Documentation         []*githubpkg.RepoDocumentation
+	Comparisons           []*types.Comparison
+	Documentation         []*types.Documentation
 	ReleaseRecommendation string
-	AllUserGuidance       []shared.UserGuidance      // All user guidance for comprehensive reporting
-	TruncationInfo        *shared.TruncationMetadata // Optional truncation information
+	AllUserGuidance       []types.UserGuidance           // All user guidance for comprehensive reporting
+	TruncationInfo        *truncation.TruncationMetadata // Optional truncation information
 }
 
-// GetReleaseRecommendation determines recommendation based on score and thresholds
-func (m *ReportMetadata) GetReleaseRecommendation(score int, autoDeployThreshold, reviewRequiredThreshold int) string {
-	if score >= autoDeployThreshold {
-		return "✅ RECOMMENDED FOR RELEASE"
-	} else if score >= reviewRequiredThreshold {
-		return "⚠️ MANUAL REVIEW REQUIRED"
-	} else {
-		return "🚫 RELEASE NOT RECOMMENDED"
+// GenerateReport parses LLM response and generates the final report
+func GenerateReport(config *ReportConfig) (score int, report string, err error) {
+	// Strip markdown code blocks if present (LLMs sometimes wrap JSON in ```json ... ```)
+	jsonContent := stripMarkdownCodeBlocks(config.LLMResponse)
+
+	// Parse the structured JSON response
+	var analysis StructuredAnalysis
+	if err := json.Unmarshal([]byte(jsonContent), &analysis); err != nil {
+		return 0, "", fmt.Errorf("failed to parse JSON response: %w", err)
 	}
-}
 
-// ProcessAnalysis converts structured analysis and metadata into final report
-func ProcessAnalysis(
-	analysis *StructuredAnalysis,
-	metadata *ReportMetadata,
-	changelogs []*changelog.Changelog,
-	documentation []*githubpkg.RepoDocumentation,
-	allUserGuidance []shared.UserGuidance,
-	truncationInfo *shared.TruncationMetadata,
-	autoDeployThreshold, reviewRequiredThreshold int,
-) (string, error) {
-	// Sort all user guidance by date (ascending)
-	// Note: allUserGuidance already contains both GitLab and GitHub guidance
-	sort.Slice(allUserGuidance, func(i, j int) bool {
-		return allUserGuidance[i].Date.Before(allUserGuidance[j].Date)
+	// Sort user guidance by date (ascending)
+	sort.Slice(config.UserGuidance, func(i, j int) bool {
+		return config.UserGuidance[i].Date.Before(config.UserGuidance[j].Date)
 	})
+
+	// Determine release recommendation based on score
+	recommendation := getReleaseRecommendation(analysis.Score, config.AutoDeployThreshold, config.ReviewRequiredThreshold)
 
 	// Create template data
 	templateData := &TemplateData{
-		Analysis:              analysis,
-		Metadata:              metadata,
-		ChangelogContent:      changelog.FormatChangelog(changelogs),
-		Documentation:         documentation,
-		ReleaseRecommendation: metadata.GetReleaseRecommendation(analysis.Score, autoDeployThreshold, reviewRequiredThreshold),
-		AllUserGuidance:       allUserGuidance,
-		TruncationInfo:        truncationInfo,
+		Analysis:              &analysis,
+		Metadata:              config.Metadata,
+		Comparisons:           config.Comparisons,
+		Documentation:         config.Documentation,
+		ReleaseRecommendation: recommendation,
+		AllUserGuidance:       config.UserGuidance,
+		TruncationInfo:        config.TruncationInfo,
 	}
 
-	// Parse and execute template
-	tmpl, err := template.New("report").Funcs(template.FuncMap{
-		"hasPrefix": strings.HasPrefix,
-		"contains":  strings.Contains,
-		"replace":   strings.ReplaceAll,
-		"gt":        func(a, b int) bool { return a > b },
-		"eq":        func(a, b string) bool { return a == b },
-		"len": func(v interface{}) int {
-			switch s := v.(type) {
-			case string:
-				return len(s)
-			case []string:
-				return len(s)
-			default:
-				return 0
-			}
-		},
-	}).Parse(reportTemplate)
-	if err != nil {
-		return "", fmt.Errorf("failed to parse report template: %w", err)
-	}
-
+	// Execute pre-compiled template
 	var buf bytes.Buffer
-	if err := tmpl.Execute(&buf, templateData); err != nil {
-		return "", fmt.Errorf("failed to execute report template: %w", err)
+	if err := reportTemplate.Execute(&buf, templateData); err != nil {
+		return 0, "", fmt.Errorf("failed to execute report template: %w", err)
 	}
 
-	return buf.String(), nil
-}
-
-// ParseStructuredResponse attempts to parse LLM response as structured JSON
-func ParseStructuredResponse(response string) (*StructuredAnalysis, error) {
-	// Try to find JSON in the response (LLM might add extra text)
-	start := strings.Index(response, "{")
-	end := strings.LastIndex(response, "}")
-
-	if start == -1 || end == -1 || end <= start {
-		return nil, fmt.Errorf("no valid JSON found in response")
-	}
-
-	jsonStr := response[start : end+1]
-
-	var analysis StructuredAnalysis
-	err := json.Unmarshal([]byte(jsonStr), &analysis)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse JSON: %w", err)
-	}
-
-	return &analysis, nil
+	return analysis.Score, buf.String(), nil
 }

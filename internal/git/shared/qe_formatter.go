@@ -1,9 +1,9 @@
-package qe
+package shared
 
 import (
 	"log/slog"
 
-	"release-confidence-score/internal/changelog"
+	"release-confidence-score/internal/git/types"
 )
 
 // LabeledCommit represents a commit with its QE testing label
@@ -28,15 +28,15 @@ type TestingCommits struct {
 	NeedsTesting []CommitsByRepo // Commits with needs-qe-testing label
 }
 
-// BuildTestingCommits extracts and organizes QE testing information from changelogs
+// BuildTestingCommits extracts and organizes QE testing information from comparisons
 // Returns nil if no QE testing labels are found
-func BuildTestingCommits(changelogs []*changelog.Changelog) *TestingCommits {
+func BuildTestingCommits(comparisons []*types.Comparison) *TestingCommits {
 	// Separate commits by QE testing status
 	var qeTestedCommits []LabeledCommit
 	var needsQETestingCommits []LabeledCommit
 
-	for _, cl := range changelogs {
-		for _, commit := range cl.Commits {
+	for _, cmp := range comparisons {
+		for _, commit := range cmp.Commits {
 			if commit.QETestingLabel == "" {
 				continue
 			}
@@ -44,7 +44,7 @@ func BuildTestingCommits(changelogs []*changelog.Changelog) *TestingCommits {
 			labeledCommit := LabeledCommit{
 				ShortSHA:       commit.ShortSHA,
 				Message:        commit.Message,
-				RepoURL:        cl.RepoURL,
+				RepoURL:        cmp.RepoURL,
 				QETestingLabel: commit.QETestingLabel,
 				PRNumber:       commit.PRNumber,
 			}

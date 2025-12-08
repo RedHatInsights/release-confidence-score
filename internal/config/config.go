@@ -3,26 +3,33 @@ package config
 import (
 	"fmt"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 )
 
+// valid log formats and levels
+var (
+	validLogFormats = []string{"text", "json"}
+	validLogLevels  = []string{"debug", "info", "warn", "error"}
+)
+
 type Config struct {
-	GitHubToken         string
-	GitLabBaseURL       string
-	GitLabSkipSSLVerify bool
-	GitLabToken         string
-	ModelAPI            string
-	ModelID             string
-	ModelProvider       string
-	UserKey             string
-	ModelSkipSSLVerify  bool
-	MaxResponseTokens   int
-	TimeoutSeconds      int
-	LogLevel            string
-	LogFormat           string
-	SystemPromptVersion string
-	ScoreThresholds     ScoreThresholds
+	GitHubToken            string
+	GitLabBaseURL          string
+	GitLabSkipSSLVerify    bool
+	GitLabToken            string
+	LogFormat              string
+	LogLevel               string
+	ModelAPI               string
+	ModelID                string
+	ModelMaxResponseTokens int
+	ModelProvider          string
+	ModelSkipSSLVerify     bool
+	ModelTimeoutSeconds    int
+	ModelUserKey           string
+	ScoreThresholds        ScoreThresholds
+	SystemPromptVersion    string
 }
 
 type ScoreThresholds struct {
@@ -30,96 +37,171 @@ type ScoreThresholds struct {
 	ReviewRequired int // Score below which manual review is required
 }
 
-// Load creates a new Config instance from environment variables
-func Load() (*Config, error) {
-	// Parse max response tokens with default
-	maxResponseTokens := 2000 // Default for LLM response length
-	if maxResponseTokensStr := os.Getenv("MODEL_MAX_RESPONSE_TOKENS"); maxResponseTokensStr != "" {
-		if parsed, err := strconv.Atoi(maxResponseTokensStr); err == nil && parsed > 0 {
-			maxResponseTokens = parsed
-		}
+// Load creates a new Config instance from environment variables and validates it
+func Load(isAppInterfaceMode bool) (*Config, error) {
+
+	// Parse Git platform configuration
+	gitHubToken := os.Getenv("RCS_GITHUB_TOKEN")
+	gitLabBaseURL := os.Getenv("RCS_GITLAB_BASE_URL")
+	gitLabToken := os.Getenv("RCS_GITLAB_TOKEN")
+
+	gitLabSkipSSL, err := parseBoolEnvOrDefault("RCS_GITLAB_SKIP_SSL_VERIFY", false)
+	if err != nil {
+		return nil, err
 	}
 
-	// Parse timeout with default
-	timeoutSeconds := 120 // Default 2 minute timeout
-	if timeoutStr := os.Getenv("MODEL_TIMEOUT_SECONDS"); timeoutStr != "" {
-		if parsed, err := strconv.Atoi(timeoutStr); err == nil && parsed > 0 {
-			timeoutSeconds = parsed
-		}
-	}
+	// Parse logging configuration
+	logFormat := os.Getenv("RCS_LOG_FORMAT")
+	logLevel := os.Getenv("RCS_LOG_LEVEL")
 
-	// Parse score thresholds with defaults
-	scoreThresholds := ScoreThresholds{
-		AutoDeploy:     80, // Default: scores 80+ are safe for auto-deploy
-		ReviewRequired: 60, // Default: scores below 60 require manual review
-	}
-
-	if autoDeployStr := os.Getenv("SCORE_THRESHOLD_AUTO_DEPLOY"); autoDeployStr != "" {
-		if parsed, err := strconv.Atoi(autoDeployStr); err == nil && parsed >= 0 && parsed <= 100 {
-			scoreThresholds.AutoDeploy = parsed
-		}
-	}
-
-	if reviewRequiredStr := os.Getenv("SCORE_THRESHOLD_REVIEW_REQUIRED"); reviewRequiredStr != "" {
-		if parsed, err := strconv.Atoi(reviewRequiredStr); err == nil && parsed >= 0 && parsed <= 100 {
-			scoreThresholds.ReviewRequired = parsed
-		}
-	}
-
-	// Get model provider from env var with default
-	modelProvider := os.Getenv("MODEL_PROVIDER")
-	if modelProvider == "" {
-		modelProvider = "claude" // default
-	}
-
-	// Get system prompt version from env var with default
-	systemPromptVersion := os.Getenv("SYSTEM_PROMPT_VERSION")
-	if systemPromptVersion == "" {
-		systemPromptVersion = "v1" // default
-	}
-
-	// Get provider-specific configuration using prefixed environment variables
+	// Parse model configuration
+	modelProvider := getEnvOrDefault("RCS_MODEL_PROVIDER", "claude")
 	prefix := strings.ToUpper(modelProvider)
-	modelAPI := os.Getenv(prefix + "_MODEL_API")
-	modelID := os.Getenv(prefix + "_MODEL_ID")
-	userKey := os.Getenv(prefix + "_USER_KEY")
+	modelAPI := os.Getenv(fmt.Sprintf("RCS_%s_MODEL_API", prefix))
+	modelID := os.Getenv(fmt.Sprintf("RCS_%s_MODEL_ID", prefix))
+	modelUserKey := os.Getenv(fmt.Sprintf("RCS_%s_USER_KEY", prefix))
 
-	// Validate required fields
-	if modelAPI == "" {
-		return nil, fmt.Errorf("%s_MODEL_API environment variable is required", prefix)
-	}
-	if modelID == "" {
-		return nil, fmt.Errorf("%s_MODEL_ID environment variable is required", prefix)
-	}
-	if userKey == "" {
-		return nil, fmt.Errorf("%s_USER_KEY environment variable is required", prefix)
+	modelSkipSSL, err := parseBoolEnvOrDefault("RCS_MODEL_SKIP_SSL_VERIFY", false)
+	if err != nil {
+		return nil, err
 	}
 
+	modelMaxResponseTokens, err := parseIntEnvOrDefault("RCS_MODEL_MAX_RESPONSE_TOKENS", 2000, 1, 1000000000)
+	if err != nil {
+		return nil, err
+	}
+	modelTimeoutSeconds, err := parseIntEnvOrDefault("RCS_MODEL_TIMEOUT_SECONDS", 120, 1, 1000000000)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse score thresholds
+	autoDeploy, err := parseIntEnvOrDefault("RCS_SCORE_THRESHOLD_AUTO_DEPLOY", 80, 0, 100)
+	if err != nil {
+		return nil, err
+	}
+	reviewRequired, err := parseIntEnvOrDefault("RCS_SCORE_THRESHOLD_REVIEW_REQUIRED", 60, 0, 100)
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse system prompt version
+	systemPromptVersion := getEnvOrDefault("RCS_SYSTEM_PROMPT_VERSION", "v1")
+
+	// Build config struct
 	cfg := &Config{
-		GitHubToken:         os.Getenv("GITHUB_TOKEN"),
-		GitLabBaseURL:       os.Getenv("GITLAB_BASE_URL"),
-		GitLabSkipSSLVerify: os.Getenv("GITLAB_SKIP_SSL_VERIFY") == "true",
-		GitLabToken:         os.Getenv("GITLAB_TOKEN"),
-		ModelAPI:            modelAPI,
-		ModelID:             modelID,
-		ModelProvider:       modelProvider,
-		UserKey:             userKey,
-		ModelSkipSSLVerify:  os.Getenv("MODEL_SKIP_SSL_VERIFY") == "true",
-		MaxResponseTokens:   maxResponseTokens,
-		TimeoutSeconds:      timeoutSeconds,
-		LogLevel:            os.Getenv("LOG_LEVEL"),
-		LogFormat:           os.Getenv("LOG_FORMAT"),
+		GitHubToken:            gitHubToken,
+		GitLabBaseURL:          gitLabBaseURL,
+		GitLabSkipSSLVerify:    gitLabSkipSSL,
+		GitLabToken:            gitLabToken,
+		LogFormat:              logFormat,
+		LogLevel:               logLevel,
+		ModelAPI:               modelAPI,
+		ModelID:                modelID,
+		ModelMaxResponseTokens: modelMaxResponseTokens,
+		ModelProvider:          modelProvider,
+		ModelSkipSSLVerify:     modelSkipSSL,
+		ModelTimeoutSeconds:    modelTimeoutSeconds,
+		ModelUserKey:           modelUserKey,
+		ScoreThresholds: ScoreThresholds{
+			AutoDeploy:     autoDeploy,
+			ReviewRequired: reviewRequired,
+		},
 		SystemPromptVersion: systemPromptVersion,
-		ScoreThresholds:     scoreThresholds,
 	}
 
-	if cfg.GitHubToken == "" {
-		return nil, fmt.Errorf("GITHUB_TOKEN environment variable is required")
-	}
-
-	if cfg.GitLabToken == "" {
-		return nil, fmt.Errorf("GITLAB_TOKEN environment variable is required")
+	// Validate configuration
+	if err := validateConfig(cfg, isAppInterfaceMode, prefix); err != nil {
+		return nil, err
 	}
 
 	return cfg, nil
+}
+
+// getEnvOrDefault returns the environment variable value or a default if not set
+func getEnvOrDefault(key, defaultVal string) string {
+	if val, ok := os.LookupEnv(key); ok {
+		return val
+	}
+	return defaultVal
+}
+
+// parseIntEnvOrDefault parses an integer environment variable with range validation or returns a default value if not set
+func parseIntEnvOrDefault(key string, defaultVal, min, max int) (int, error) {
+	str, ok := os.LookupEnv(key)
+	if !ok {
+		return defaultVal, nil
+	}
+
+	val, err := strconv.Atoi(str)
+	if err != nil {
+		return 0, fmt.Errorf("%s must be a valid integer, got: %s", key, str)
+	}
+
+	if val < min || val > max {
+		return 0, fmt.Errorf("%s must be between %d and %d, got: %d", key, min, max, val)
+	}
+
+	return val, nil
+}
+
+// parseBoolEnvOrDefault parses a boolean environment variable or returns a default value if not set
+func parseBoolEnvOrDefault(key string, defaultVal bool) (bool, error) {
+	str, ok := os.LookupEnv(key)
+	if !ok {
+		return defaultVal, nil
+	}
+
+	val, err := strconv.ParseBool(str)
+	if err != nil {
+		return false, fmt.Errorf("%s must be a valid boolean, got: %s", key, str)
+	}
+
+	return val, nil
+}
+
+// validateConfig performs all validation on the loaded configuration
+func validateConfig(cfg *Config, isAppInterfaceMode bool, modelProviderPrefix string) error {
+
+	// Validate Git platform configuration
+	if cfg.GitHubToken == "" && cfg.GitLabToken == "" {
+		return fmt.Errorf("at least one of RCS_GITHUB_TOKEN or RCS_GITLAB_TOKEN is required")
+	}
+	if isAppInterfaceMode && cfg.GitLabToken == "" {
+		return fmt.Errorf("RCS_GITLAB_TOKEN environment variable is required for app-interface mode")
+	}
+	if cfg.GitLabToken != "" && cfg.GitLabBaseURL == "" {
+		return fmt.Errorf("RCS_GITLAB_BASE_URL environment variable is required when RCS_GITLAB_TOKEN is provided")
+	}
+
+	// Validate logging configuration
+	if cfg.LogFormat != "" {
+		if !slices.Contains(validLogFormats, strings.ToLower(cfg.LogFormat)) {
+			return fmt.Errorf("RCS_LOG_FORMAT must be one of: %v; got: %s", validLogFormats, cfg.LogFormat)
+		}
+	}
+	if cfg.LogLevel != "" {
+		if !slices.Contains(validLogLevels, strings.ToLower(cfg.LogLevel)) {
+			return fmt.Errorf("RCS_LOG_LEVEL must be one of: %v; got: %s", validLogLevels, cfg.LogLevel)
+		}
+	}
+
+	// Validate required model configuration
+	if cfg.ModelAPI == "" {
+		return fmt.Errorf("RCS_%s_MODEL_API environment variable is required", modelProviderPrefix)
+	}
+	if cfg.ModelID == "" {
+		return fmt.Errorf("RCS_%s_MODEL_ID environment variable is required", modelProviderPrefix)
+	}
+	if cfg.ModelUserKey == "" {
+		return fmt.Errorf("RCS_%s_USER_KEY environment variable is required", modelProviderPrefix)
+	}
+
+	// Validate score threshold logic
+	if cfg.ScoreThresholds.AutoDeploy < cfg.ScoreThresholds.ReviewRequired {
+		return fmt.Errorf("RCS_SCORE_THRESHOLD_AUTO_DEPLOY (%d) must be greater than or equal to RCS_SCORE_THRESHOLD_REVIEW_REQUIRED (%d)",
+			cfg.ScoreThresholds.AutoDeploy, cfg.ScoreThresholds.ReviewRequired)
+	}
+
+	return nil
 }

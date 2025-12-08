@@ -16,7 +16,8 @@
 ### Change Characteristics
 {{.Analysis.ChangeCharacteristicsVisual}}
 
-{{if .TruncationInfo}}{{if .TruncationInfo.Truncated}}
+{{- if .TruncationInfo}}
+
 ### ⚠️ Analysis Note: Diff Truncation Applied
 
 Due to the large size of the code changes, diff truncation was applied to fit within the LLM context window:
@@ -33,90 +34,152 @@ Due to the large size of the code changes, diff truncation was applied to fit wi
 
 **What was truncated:**
 - Middle sections of low-risk files (primarily tests and documentation)
-{{if eq .TruncationInfo.Level "aggressive"}}- Middle sections of medium-risk files (dependencies, lock files){{end}}
+{{- if eq .TruncationInfo.Level "aggressive"}}
+- Middle sections of medium-risk files (dependencies, lock files)
+{{- end}}
 
 The LLM was informed about the truncation and used file metadata, preserved critical code, and partial context to perform the risk analysis.
+{{- end}}
 
-{{end}}{{end}}
 ---
 
 ## 🔮 Confidence Breakdown
 
-{{if .Analysis.PositiveFactors}}### ✅ Positive Indicators
+{{- if .Analysis.PositiveFactors}}
+
+### ✅ Positive Indicators
 {{.Analysis.PositiveFactors}}
+{{- end}}
 
-{{end}}{{if .Analysis.RiskFactors}}### ⚠️ Risk Indicators
+{{- if .Analysis.RiskFactors}}
+
+### ⚠️ Risk Indicators
 {{.Analysis.RiskFactors}}
+{{- end}}
 
-{{end}}{{if .Analysis.BlockingIssues}}### 🚫 Blocking Issues
+{{- if .Analysis.BlockingIssues}}
+
+### 🚫 Blocking Issues
 {{.Analysis.BlockingIssues}}
+{{- end}}
 
-{{end}}---
+---
+
+{{- define "technicalAnalysisSection"}}
+{{.Summary}}
+
+{{- if .KeyFindings}}
+
+**🔍 Key Findings:**
+{{- range .KeyFindings}}
+- {{.}}
+{{- end}}
+{{- end}}
+
+{{- if .RiskFactors}}
+
+**⚠️ Risk Factors:**
+{{- range .RiskFactors}}
+- {{.}}
+{{- end}}
+{{- end}}
+{{- end}}
 
 ## 🛠️ Technical Analysis
 
 ### 📝 Code Impact Analysis
-{{.Analysis.CodeAnalysis.Summary}}
+{{template "technicalAnalysisSection" .Analysis.CodeAnalysis}}
 
-{{if .Analysis.CodeAnalysis.KeyFindings}}**🔍 Key Findings:**
-{{range .Analysis.CodeAnalysis.KeyFindings}}- {{.}}
-{{end}}
-{{end}}{{if .Analysis.CodeAnalysis.RiskFactors}}**⚠️ Risk Factors:**
-{{range .Analysis.CodeAnalysis.RiskFactors}}- {{.}}
-{{end}}
-{{end}}### 🏗️ Infrastructure & Deployment Impact
-{{.Analysis.InfrastructureAnalysis.Summary}}
+### 🏗️ Infrastructure & Deployment Impact
+{{template "technicalAnalysisSection" .Analysis.InfrastructureAnalysis}}
 
-{{if .Analysis.InfrastructureAnalysis.KeyFindings}}**🔍 Key Findings:**
-{{range .Analysis.InfrastructureAnalysis.KeyFindings}}- {{.}}
-{{end}}
-{{end}}{{if .Analysis.InfrastructureAnalysis.RiskFactors}}**⚠️ Risk Factors:**
-{{range .Analysis.InfrastructureAnalysis.RiskFactors}}- {{.}}
-{{end}}
-{{end}}### 🔗 Dependencies & Integration Impact
-{{.Analysis.DependencyAnalysis.Summary}}
+### 🔗 Dependencies & Integration Impact
+{{template "technicalAnalysisSection" .Analysis.DependencyAnalysis}}
 
-{{if .Analysis.DependencyAnalysis.KeyFindings}}**🔍 Key Findings:**
-{{range .Analysis.DependencyAnalysis.KeyFindings}}- {{.}}
-{{end}}
-{{end}}{{if .Analysis.DependencyAnalysis.RiskFactors}}**⚠️ Risk Factors:**
-{{range .Analysis.DependencyAnalysis.RiskFactors}}- {{.}}
-{{end}}
-{{end}}---
+---
 
 ## 📋 Action Items
 
-{{if .Analysis.ActionItems.Critical}}### 🔥 Critical (Complete Before Release)
-{{range .Analysis.ActionItems.Critical}}- {{.}}
-{{end}}
-{{end}}{{if .Analysis.ActionItems.Important}}### ⚠️ Important (Recommended Before Release)
-{{range .Analysis.ActionItems.Important}}- {{.}}
-{{end}}
-{{end}}{{if .Analysis.ActionItems.Followup}}### 📝 Follow-up (Post-Release)
-{{range .Analysis.ActionItems.Followup}}- {{.}}
-{{end}}
-{{end}}---
+{{- if .Analysis.ActionItems.Critical}}
+
+### 🔥 Critical (Complete Before Release)
+{{- range .Analysis.ActionItems.Critical}}
+- {{.}}
+{{- end}}
+{{- end}}
+
+{{- if .Analysis.ActionItems.Important}}
+
+### ⚠️ Important (Recommended Before Release)
+{{- range .Analysis.ActionItems.Important}}
+- {{.}}
+{{- end}}
+{{- end}}
+
+{{- if .Analysis.ActionItems.Followup}}
+
+### 📝 Follow-up (Post-Release)
+{{- range .Analysis.ActionItems.Followup}}
+- {{.}}
+{{- end}}
+{{- end}}
+
+---
 
 ## 📚 Release Documentations
 
 ### 🔍 Overall Assessment
 {{.Analysis.DocumentationQuality}}
 
-### 💡 Improvement Recommendations  
+### 💡 Improvement Recommendations
 {{.Analysis.DocumentationRecommendations}}
 
 ### 📁 Documentation Sources Analyzed
-{{if .Documentation}}{{range .Documentation}}{{$doc := .}}{{$repoURL := .RepoURL}}{{$branch := .DefaultBranch}}- {{$repoURL}}/blob/{{$branch}}/{{.EntryPointFile}} - {{len .EntryPoint}} chars
-{{range $filename := .LinkedDocsOrder}}{{if index $doc.LinkedDocs $filename}}- {{if hasPrefix $filename "http"}}{{$filename}}{{else}}{{$repoURL}}/blob/{{$branch}}/{{$filename}}{{end}} - {{len (index $doc.LinkedDocs $filename)}} chars
-{{end}}{{end}}{{end}}{{else}}No repository documentation was found or analyzed.{{end}}
+{{- if .Documentation}}
+{{- range .Documentation}}
+{{- $doc := .}}
+{{docFileInfo .MainDocFile .Repository.URL .Repository.DefaultBranch .MainDocContent}}
+{{- range $filename := .LinkedDocsOrder}}
+{{- if index $doc.LinkedDocs $filename}}
+{{docFileInfo $filename $doc.Repository.URL $doc.Repository.DefaultBranch (index $doc.LinkedDocs $filename)}}
+{{- end}}
+{{- end}}
+{{- end}}
+{{- else}}
+No repository documentation was found or analyzed.
+{{- end}}
 
 ---
 
 ## 📋 Release Changelogs
 
-{{.ChangelogContent}}
+{{- if .Comparisons}}
+{{- range $i, $comparison := .Comparisons}}
+{{- if gt $i 0}}
 
-{{if .AllUserGuidance}}---
+{{- end}}
+
+### [{{$comparison.RepoURL}}]({{$comparison.DiffURL}})
+
+{{- if $comparison.Commits}}
+*Total commits: {{len $comparison.Commits}}*
+
+| SHA | Message | Author | PR | QE Status |
+|-----|---------|--------|----|-----------|
+{{- range $comparison.Commits}}
+| {{commitLink .ShortSHA .SHA $comparison.RepoURL}} | {{escapePipes .Message}} | {{escapePipes .Author}} | {{prLink .PRNumber $comparison.RepoURL}} | {{qeStatus .QETestingLabel}} |
+{{- end}}
+{{- else}}
+*No commits found in this comparison.*
+{{- end}}
+{{- end}}
+{{- else}}
+No repository changelog data available.
+{{- end}}
+
+{{- if .AllUserGuidance}}
+
+---
 
 ## 📝 User Guidance
 
@@ -124,11 +187,14 @@ The following user guidance was provided in GitLab MR and GitHub PR discussions:
 
 | Guidance | Author | Date | Status | Comment |
 |----------|--------|------|--------|---------|
-{{range .AllUserGuidance}}| {{.Content}} | {{if contains .CommentURL "github.com"}}[@{{.Author}}](https://github.com/{{.Author}}){{else}}@{{.Author}}{{end}} | {{.Date.Format "2006-01-02 15:04"}} | {{if .IsAuthorized}}✅ Authorized{{else}}❌ Unauthorized{{end}} | [View]({{.CommentURL}}) |
-{{end}}
-**Note:** Only authorized guidance is used in the LLM analysis. For GitHub PRs, this includes guidance from PR authors and meaningful approvers. For GitLab MRs, all guidance is considered authorized. Unauthorized guidance is listed here for transparency but is ignored during scoring.
+{{- range .AllUserGuidance}}
+| {{.Content}} | {{formatAuthor .Author .CommentURL}} | {{formatDate .Date}} | {{authorizationStatus .IsAuthorized}} | [View]({{.CommentURL}}) |
+{{- end}}
 
-{{end}}---
+**Note:** Only authorized guidance is used in the LLM analysis. For GitHub PRs, this includes guidance from PR authors and meaningful approvers. For GitLab MRs, all guidance is considered authorized. Unauthorized guidance is listed here for transparency but is ignored during scoring.
+{{- end}}
+
+---
 
 ## 📈 Want Better Analysis Results?
 
