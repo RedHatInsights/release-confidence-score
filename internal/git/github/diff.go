@@ -12,11 +12,11 @@ import (
 
 // fetchDiff fetches comparison data from GitHub and enriches commits with PR metadata and QE labels
 // Returns a complete Comparison with enriched commits, files, and stats
-func fetchDiff(client *github.Client, owner, repo, base, head, diffURL string) (*types.Comparison, error) {
+func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, head, diffURL string) (*types.Comparison, error) {
 	slog.Debug("Starting comparison fetch and enrichment", "owner", owner, "repo", repo, "base", base, "head", head)
 
 	// Fetch comparison data with all commits (handles pagination)
-	ghComparison, allCommits, err := fetchComparisonWithPagination(client, owner, repo, base, head)
+	ghComparison, allCommits, err := fetchComparisonWithPagination(ctx, client, owner, repo, base, head)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func fetchDiff(client *github.Client, owner, repo, base, head, diffURL string) (
 		}
 
 		// Build commit entry with PR enrichment
-		commitEntry := buildCommitEntry(commit, client, owner, repo, repoURL, cache)
+		commitEntry := buildCommitEntry(ctx, commit, client, owner, repo, repoURL, cache)
 		if commitEntry != nil {
 			comparison.Commits = append(comparison.Commits, *commitEntry)
 		}
@@ -57,7 +57,7 @@ func fetchDiff(client *github.Client, owner, repo, base, head, diffURL string) (
 }
 
 // buildCommitEntry creates a commit entry from a GitHub commit with PR enrichment
-func buildCommitEntry(commit *github.RepositoryCommit, client *github.Client, owner, repo, repoURL string, cache *prCache) *types.Commit {
+func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, client *github.Client, owner, repo, repoURL string, cache *prCache) *types.Commit {
 	if commit.SHA == nil {
 		return nil
 	}
@@ -83,7 +83,7 @@ func buildCommitEntry(commit *github.RepositoryCommit, client *github.Client, ow
 	}
 
 	// Find PR for this commit (cached)
-	prNumber, err := cache.getOrFetchPRForCommit(client, owner, repo, entry.SHA)
+	prNumber, err := cache.getOrFetchPRForCommit(ctx, client, owner, repo, entry.SHA)
 	if err != nil {
 		slog.Warn("Failed to find PR for commit", "commit", entry.ShortSHA, "error", err)
 		return entry
@@ -98,7 +98,7 @@ func buildCommitEntry(commit *github.RepositoryCommit, client *github.Client, ow
 	entry.PRNumber = prNumber
 
 	// Get PR object (cached)
-	pr, err := cache.getOrFetchPR(client, owner, repo, prNumber)
+	pr, err := cache.getOrFetchPR(ctx, client, owner, repo, prNumber)
 	if err != nil {
 		slog.Warn("Failed to get PR object", "pr", prNumber, "error", err)
 		return entry
@@ -187,7 +187,7 @@ func (c *prCache) getPR(prNumber int) *github.PullRequest {
 	return nil
 }
 
-func (c *prCache) getOrFetchPRForCommit(client *github.Client, owner, repo, commitSHA string) (int, error) {
+func (c *prCache) getOrFetchPRForCommit(ctx context.Context, client *github.Client, owner, repo, commitSHA string) (int, error) {
 	key := cacheKey(owner, repo, commitSHA)
 
 	if prNumber, exists := c.commitToPR[key]; exists {
@@ -196,7 +196,7 @@ func (c *prCache) getOrFetchPRForCommit(client *github.Client, owner, repo, comm
 	}
 
 	// Fetch from GitHub API
-	prs, resp, err := client.PullRequests.ListPullRequestsWithCommit(context.Background(), owner, repo, commitSHA, nil)
+	prs, resp, err := client.PullRequests.ListPullRequestsWithCommit(ctx, owner, repo, commitSHA, nil)
 	if err != nil {
 		return 0, fmt.Errorf("failed to find PRs for commit %s: %w", commitSHA[:8], err)
 	}
@@ -224,7 +224,7 @@ func (c *prCache) getOrFetchPRForCommit(client *github.Client, owner, repo, comm
 	return 0, nil
 }
 
-func (c *prCache) getOrFetchPR(client *github.Client, owner, repo string, prNumber int) (*github.PullRequest, error) {
+func (c *prCache) getOrFetchPR(ctx context.Context, client *github.Client, owner, repo string, prNumber int) (*github.PullRequest, error) {
 	if prNumber == 0 {
 		return nil, nil
 	}
@@ -236,7 +236,7 @@ func (c *prCache) getOrFetchPR(client *github.Client, owner, repo string, prNumb
 		return pr, nil
 	}
 
-	pr, resp, err := client.PullRequests.Get(context.Background(), owner, repo, prNumber)
+	pr, resp, err := client.PullRequests.Get(ctx, owner, repo, prNumber)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get PR #%d: %w", prNumber, err)
 	}
@@ -248,8 +248,7 @@ func (c *prCache) getOrFetchPR(client *github.Client, owner, repo string, prNumb
 
 // fetchComparisonWithPagination fetches comparison data with full commit pagination
 // GitHub API limits commits per page, so we need to paginate to get all commits
-func fetchComparisonWithPagination(client *github.Client, owner, repo, base, head string) (*github.CommitsComparison, []*github.RepositoryCommit, error) {
-	ctx := context.Background()
+func fetchComparisonWithPagination(ctx context.Context, client *github.Client, owner, repo, base, head string) (*github.CommitsComparison, []*github.RepositoryCommit, error) {
 	page := 1
 	perPage := 100
 	var allCommits []*github.RepositoryCommit

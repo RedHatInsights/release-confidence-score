@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 
 	"gitlab.com/gitlab-org/api/client-go"
 	"release-confidence-score/internal/git/types"
@@ -151,7 +150,7 @@ type mrCache struct {
 	commitToMR    map[string]int                  // commit SHA -> MR IID
 	mergeRequests map[string]*gitlab.MergeRequest // "project/mriid" -> MR object
 	mrNotes       map[string][]*gitlab.Note       // "project/mriid" -> MR notes
-	mu            sync.RWMutex
+	mrApprovers   map[string][]string             // "project/mriid" -> list of approver usernames
 }
 
 func newMRCache() *mrCache {
@@ -159,6 +158,7 @@ func newMRCache() *mrCache {
 		commitToMR:    make(map[string]int),
 		mergeRequests: make(map[string]*gitlab.MergeRequest),
 		mrNotes:       make(map[string][]*gitlab.Note),
+		mrApprovers:   make(map[string][]string),
 	}
 }
 
@@ -168,15 +168,11 @@ func cacheKey(projectPath string, mrIID int) string {
 
 // getCommitMRIID gets cached MR IID for a commit (doesn't fetch if not in cache)
 func (c *mrCache) getCommitMRIID(commitSHA string) int {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	return c.commitToMR[commitSHA]
 }
 
 // getMR gets cached MR object (doesn't fetch if not in cache)
 func (c *mrCache) getMR(mrIID int) *gitlab.MergeRequest {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
 	for _, mr := range c.mergeRequests {
 		if mr.IID == mrIID {
 			return mr
@@ -186,14 +182,11 @@ func (c *mrCache) getMR(mrIID int) *gitlab.MergeRequest {
 }
 
 func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, commitSHA string) (int, error) {
-	// Check cache first (read lock)
-	c.mu.RLock()
+	// Check cache first
 	if mrIID, exists := c.commitToMR[commitSHA]; exists {
-		c.mu.RUnlock()
 		slog.Debug("Using cached commit→MR mapping", "commit", commitSHA[:8], "mr_iid", mrIID)
 		return mrIID, nil
 	}
-	c.mu.RUnlock()
 
 	// Cache miss - fetch from API
 	mrs, _, err := client.Commits.ListMergeRequestsByCommit(projectPath, commitSHA)
@@ -205,9 +198,7 @@ func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, comm
 
 	// If no MRs found, cache 0 to avoid re-fetching
 	if len(mrs) == 0 {
-		c.mu.Lock()
 		c.commitToMR[commitSHA] = 0
-		c.mu.Unlock()
 		return 0, nil
 	}
 
@@ -223,10 +214,8 @@ func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, comm
 		selectedMR = mrs[0]
 	}
 
-	// Cache the result (write lock)
-	c.mu.Lock()
+	// Cache the result
 	c.commitToMR[commitSHA] = selectedMR.IID
-	c.mu.Unlock()
 
 	return selectedMR.IID, nil
 }
@@ -238,14 +227,11 @@ func (c *mrCache) getOrFetchMR(client *gitlab.Client, projectPath string, mrIID 
 
 	key := cacheKey(projectPath, mrIID)
 
-	// Check cache first (read lock)
-	c.mu.RLock()
+	// Check cache first
 	if mr, exists := c.mergeRequests[key]; exists {
-		c.mu.RUnlock()
 		slog.Debug("Using cached MR object", "mr_iid", mrIID)
 		return mr, nil
 	}
-	c.mu.RUnlock()
 
 	// Cache miss - fetch from API
 	mr, _, err := client.MergeRequests.GetMergeRequest(projectPath, mrIID, &gitlab.GetMergeRequestsOptions{})
@@ -255,10 +241,8 @@ func (c *mrCache) getOrFetchMR(client *gitlab.Client, projectPath string, mrIID 
 
 	slog.Debug("GitLab API response", "mr_iid", mrIID)
 
-	// Cache the result (write lock)
-	c.mu.Lock()
+	// Cache the result
 	c.mergeRequests[key] = mr
-	c.mu.Unlock()
 
 	return mr, nil
 }

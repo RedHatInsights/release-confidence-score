@@ -1,4 +1,4 @@
-package types
+package shared
 
 import (
 	"testing"
@@ -66,10 +66,10 @@ func TestParseUserGuidance(t *testing.T) {
 			expectedFound: true,
 		},
 		{
-			name:          "text before rcs is ignored",
+			name:          "text before rcs should not match",
 			input:         "Before\n/rcs important guidance\nAfter",
-			expectedText:  "important guidance\nAfter",
-			expectedFound: true,
+			expectedText:  "",
+			expectedFound: false,
 		},
 		{
 			name:          "captures everything after first /rcs",
@@ -114,16 +114,34 @@ func TestParseUserGuidanceEdgeCases(t *testing.T) {
 			expectedFound: true,
 		},
 		{
-			name:          "captures text after /rcs including newlines",
+			name:          "text before /rcs should not match",
 			input:         "Line 1\nLine 2\n/rcs guidance here\nLine 3",
-			expectedText:  "guidance here\nLine 3",
-			expectedFound: true,
+			expectedText:  "",
+			expectedFound: false,
 		},
 		{
 			name:          "multiple spaces after rcs",
 			input:         "/rcs     multiple     spaces",
 			expectedText:  "multiple     spaces",
 			expectedFound: true,
+		},
+		{
+			name:          "leading tabs should work",
+			input:         "\t\t/rcs guidance with tabs",
+			expectedText:  "guidance with tabs",
+			expectedFound: true,
+		},
+		{
+			name:          "non-whitespace before /rcs should not match",
+			input:         "Some text /rcs this should not match",
+			expectedText:  "",
+			expectedFound: false,
+		},
+		{
+			name:          "inline /rcs should not match",
+			input:         "Please note: /rcs this is important",
+			expectedText:  "",
+			expectedFound: false,
 		},
 	}
 
