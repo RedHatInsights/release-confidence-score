@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"release-confidence-score/internal/config"
+	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
@@ -106,7 +107,7 @@ func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitla
 	mrURL := fmt.Sprintf("%s/%s/-/merge_requests/%d", cfg.GitLabBaseURL, projectID, mergeRequestIID)
 
 	for _, note := range notes {
-		guidanceContent, found := types.ParseUserGuidance(note.Body)
+		guidanceContent, found := shared.ParseUserGuidance(note.Body)
 		if !found {
 			continue
 		}
