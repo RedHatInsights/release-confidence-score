@@ -3,7 +3,7 @@ module release-confidence-score
 go 1.24.0
 
 require (
-	github.com/google/go-github/v79 v79.0.0
+	github.com/google/go-github/v80 v80.0.0
 	gitlab.com/gitlab-org/api/client-go v0.161.1
 )
 
