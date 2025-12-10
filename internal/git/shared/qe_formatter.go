@@ -13,7 +13,7 @@ type LabeledCommit struct {
 	Message        string
 	RepoURL        string
 	QETestingLabel string // "qe-tested", "needs-qe-testing", or empty
-	PRNumber       int
+	PRNumber       int64
 }
 
 // CommitsByRepo groups commits by repository for cleaner display

@@ -74,7 +74,7 @@ func TestIsValidNote(t *testing.T) {
 func TestProcessNote(t *testing.T) {
 	now := time.Now()
 	repoURL := "https://gitlab.com/owner/repo"
-	mrIID := 123
+	mrIID := int64(123)
 
 	tests := []struct {
 		name           string

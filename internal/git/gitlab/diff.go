@@ -147,7 +147,7 @@ func extractQELabel(mr *gitlab.MergeRequest) string {
 // mrCache caches GitLab API responses to avoid duplicate calls
 // Internal to enrichment - not exposed outside this file
 type mrCache struct {
-	commitToMR    map[string]int                  // commit SHA -> MR IID
+	commitToMR    map[string]int64                // commit SHA -> MR IID
 	mergeRequests map[string]*gitlab.MergeRequest // "project/mriid" -> MR object
 	mrNotes       map[string][]*gitlab.Note       // "project/mriid" -> MR notes
 	mrApprovers   map[string][]string             // "project/mriid" -> list of approver usernames
@@ -155,24 +155,24 @@ type mrCache struct {
 
 func newMRCache() *mrCache {
 	return &mrCache{
-		commitToMR:    make(map[string]int),
+		commitToMR:    make(map[string]int64),
 		mergeRequests: make(map[string]*gitlab.MergeRequest),
 		mrNotes:       make(map[string][]*gitlab.Note),
 		mrApprovers:   make(map[string][]string),
 	}
 }
 
-func cacheKey(projectPath string, mrIID int) string {
+func cacheKey(projectPath string, mrIID int64) string {
 	return fmt.Sprintf("%s/%d", projectPath, mrIID)
 }
 
 // getCommitMRIID gets cached MR IID for a commit (doesn't fetch if not in cache)
-func (c *mrCache) getCommitMRIID(commitSHA string) int {
+func (c *mrCache) getCommitMRIID(commitSHA string) int64 {
 	return c.commitToMR[commitSHA]
 }
 
 // getMR gets cached MR object (doesn't fetch if not in cache)
-func (c *mrCache) getMR(mrIID int) *gitlab.MergeRequest {
+func (c *mrCache) getMR(mrIID int64) *gitlab.MergeRequest {
 	for _, mr := range c.mergeRequests {
 		if mr.IID == mrIID {
 			return mr
@@ -181,7 +181,7 @@ func (c *mrCache) getMR(mrIID int) *gitlab.MergeRequest {
 	return nil
 }
 
-func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, commitSHA string) (int, error) {
+func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, commitSHA string) (int64, error) {
 	// Check cache first
 	if mrIID, exists := c.commitToMR[commitSHA]; exists {
 		slog.Debug("Using cached commit→MR mapping", "commit", commitSHA[:8], "mr_iid", mrIID)
@@ -220,7 +220,7 @@ func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, comm
 	return selectedMR.IID, nil
 }
 
-func (c *mrCache) getOrFetchMR(client *gitlab.Client, projectPath string, mrIID int) (*gitlab.MergeRequest, error) {
+func (c *mrCache) getOrFetchMR(client *gitlab.Client, projectPath string, mrIID int64) (*gitlab.MergeRequest, error) {
 	if mrIID == 0 {
 		return nil, nil
 	}

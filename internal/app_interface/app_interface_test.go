@@ -173,7 +173,7 @@ func TestExtractUserGuidance(t *testing.T) {
 		t.Fatalf("Failed to load config: %v", err)
 	}
 
-	mergeRequestIID := 123
+	mergeRequestIID := int64(123)
 	createdAt := time.Now()
 
 	tests := []struct {
@@ -379,6 +379,6 @@ func TestPostReportToMR(t *testing.T) {
 	t.Run("function signature accepts client parameter", func(t *testing.T) {
 		// Verify the function exists with the expected signature
 		// This is a compile-time check that ensures the refactoring is correct
-		var _ func(*gitlabapi.Client, string, int) error = PostReportToMR
+		var _ func(*gitlabapi.Client, string, int64) error = PostReportToMR
 	})
 }

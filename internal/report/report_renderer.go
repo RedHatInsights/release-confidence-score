@@ -66,7 +66,7 @@ func authorizationStatus(isAuthorized bool) string {
 	return "❌ Unauthorized"
 }
 
-func prLink(prNumber int, repoURL string) string {
+func prLink(prNumber int64, repoURL string) string {
 	if prNumber > 0 {
 		return fmt.Sprintf("[#%d](%s/pull/%d)", prNumber, repoURL, prNumber)
 	}
