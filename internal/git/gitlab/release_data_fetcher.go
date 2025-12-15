@@ -1,15 +1,17 @@
 package gitlab
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"regexp"
 	"strings"
 
-	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/types"
+
+	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
 
 // gitlabCompareRegex matches GitLab compare URLs and extracts components
@@ -71,10 +73,9 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	}
 
 	// Extract user guidance from MRs in the comparison
-	userGuidance, err := FetchUserGuidance(f.client, encodedPath, comparison)
+	userGuidance, err := fetchUserGuidance(context.Background(), f.client, encodedPath, comparison)
 	if err != nil {
-		slog.Warn("Failed to fetch user guidance (non-fatal)", "error", err)
-		userGuidance = []types.UserGuidance{}
+		return nil, nil, nil, fmt.Errorf("failed to fetch user guidance: %w", err)
 	}
 
 	slog.Debug("Release data fetched successfully",

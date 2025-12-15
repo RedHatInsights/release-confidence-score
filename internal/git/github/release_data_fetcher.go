@@ -1,6 +1,7 @@
 package github
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -59,16 +60,15 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	}
 
 	// Fetch comparison and enrich commits with PR metadata and QE labels
-	comparison, err := fetchDiff(f.client, owner, repo, base, head, compareURL)
+	comparison, err := fetchDiff(context.Background(), f.client, owner, repo, base, head, compareURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch and enrich comparison: %w", err)
 	}
 
 	// Extract user guidance from PRs in the comparison
-	userGuidance, err := FetchUserGuidance(f.client, owner, repo, comparison)
+	userGuidance, err := fetchUserGuidance(context.Background(), f.client, owner, repo, comparison)
 	if err != nil {
-		slog.Warn("Failed to fetch user guidance (non-fatal)", "error", err)
-		userGuidance = []types.UserGuidance{}
+		return nil, nil, nil, fmt.Errorf("failed to fetch user guidance: %w", err)
 	}
 
 	slog.Debug("Release data fetched successfully",
