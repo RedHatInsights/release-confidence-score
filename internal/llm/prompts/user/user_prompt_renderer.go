@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"text/template"
 
-	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 	"release-confidence-score/internal/llm/truncation"
 )
@@ -26,18 +25,15 @@ func init() {
 type PromptData struct {
 	Diff               string
 	Documentation      string
-	QETesting          *shared.TestingCommits         // QE testing commits grouped by status and repository
 	TruncationMetadata *truncation.TruncationMetadata // Optional truncation information
 	UserGuidance       []string
 }
 
-// RenderUserPrompt formats the user prompt with actual diff, conditionally including documentation, user guidance, detailed QE testing label information, and truncation metadata
-func RenderUserPrompt(diff, documentation string, userGuidance []types.UserGuidance, qeTesting *shared.TestingCommits, truncationMetadata truncation.TruncationMetadata) (string, error) {
-	// Create template data
+// RenderUserPrompt formats the user prompt with diff, documentation, user guidance, and truncation metadata
+func RenderUserPrompt(diff, documentation string, userGuidance []types.UserGuidance, truncationMetadata truncation.TruncationMetadata) (string, error) {
 	data := PromptData{
 		Diff:          diff,
 		Documentation: documentation,
-		QETesting:     qeTesting,
 		UserGuidance:  extractAuthorizedGuidance(userGuidance),
 	}
 

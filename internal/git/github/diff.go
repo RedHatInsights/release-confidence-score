@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/google/go-github/v80/github"
+	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 )
 
@@ -105,40 +106,23 @@ func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, clie
 	}
 
 	// Extract QE testing label
-	qeLabel := extractQELabel(pr)
-	entry.QETestingLabel = qeLabel
+	entry.QETestingLabel = extractQELabel(pr)
 
-	slog.Debug("Enriched commit", "commit", entry.ShortSHA, "pr", prNumber, "qe_label", qeLabel)
+	slog.Debug("Enriched commit", "commit", entry.ShortSHA, "pr", prNumber, "qe_label", entry.QETestingLabel)
 
 	return entry
 }
 
 // extractQELabel extracts the QE testing label from a PR
-// Returns "qe-tested", "needs-qe-testing", or empty string
 func extractQELabel(pr *github.PullRequest) string {
 	if pr == nil {
 		return ""
 	}
-
-	hasQeTested := false
-	hasNeedsQETesting := false
-
-	for _, label := range pr.Labels {
-		labelName := label.GetName()
-		if labelName == "rcs/qe-tested" {
-			hasQeTested = true
-		} else if labelName == "rcs/needs-qe-testing" {
-			hasNeedsQETesting = true
-		}
+	labelNames := make([]string, len(pr.Labels))
+	for i, label := range pr.Labels {
+		labelNames[i] = label.GetName()
 	}
-
-	// Priority logic: qe-tested takes precedence over needs-qe-testing
-	if hasQeTested {
-		return "qe-tested"
-	} else if hasNeedsQETesting {
-		return "needs-qe-testing"
-	}
-	return ""
+	return shared.ExtractQELabel(labelNames)
 }
 
 // prCache caches GitHub API responses to avoid duplicate calls

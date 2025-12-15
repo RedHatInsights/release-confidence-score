@@ -80,18 +80,17 @@ func TestEscapePipes(t *testing.T) {
 
 func TestQEStatus(t *testing.T) {
 	tests := []struct {
-		name     string
 		label    string
 		expected string
 	}{
-		{"qe-tested", "qe-tested", "✅ Tested"},
-		{"needs-qe-testing", "needs-qe-testing", "⚠️ Needs Testing"},
-		{"empty", "", "N/A"},
-		{"unknown", "some-other-label", "N/A"},
+		{"rcs/qe-tested", "✅ Tested"},
+		{"rcs/needs-qe-testing", "⚠️ Needs Testing"},
+		{"", "N/A"},
+		{"some-other-label", "N/A"},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
+		t.Run(tt.label, func(t *testing.T) {
 			result := qeStatus(tt.label)
 			if result != tt.expected {
 				t.Errorf("qeStatus(%q) = %q, want %q", tt.label, result, tt.expected)
@@ -606,7 +605,7 @@ func TestGenerateReportWithComparisons(t *testing.T) {
 					Message:        "Fix bug | with pipe",
 					Author:         "John Doe",
 					PRNumber:       123,
-					QETestingLabel: "qe-tested",
+					QETestingLabel: "rcs/qe-tested",
 				},
 				{
 					SHA:            "def456abc789",
@@ -614,7 +613,7 @@ func TestGenerateReportWithComparisons(t *testing.T) {
 					Message:        "Another fix",
 					Author:         "Jane Smith",
 					PRNumber:       0,
-					QETestingLabel: "needs-qe-testing",
+					QETestingLabel: "rcs/needs-qe-testing",
 				},
 			},
 			Files: []types.FileChange{},
