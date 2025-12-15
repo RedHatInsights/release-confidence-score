@@ -6,10 +6,9 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/google/go-github/v80/github"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
-
-	"github.com/google/go-github/v79/github"
 )
 
 // fetchUserGuidance extracts user guidance from all PRs in the comparison
