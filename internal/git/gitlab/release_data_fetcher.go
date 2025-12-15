@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"release-confidence-score/internal/config"
+	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
@@ -40,7 +41,7 @@ func (f *Fetcher) Name() string {
 
 // IsCompareURL checks if a URL is a valid GitLab compare URL
 func (f *Fetcher) IsCompareURL(url string) bool {
-	return IsGitLabCompareURL(url)
+	return gitlabCompareRegex.MatchString(url)
 }
 
 // FetchReleaseData fetches all release data for a GitLab compare URL
@@ -49,25 +50,18 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	slog.Debug("Fetching GitLab release data", "url", compareURL)
 
 	// Parse compare URL
-	host, projectPath, baseRef, headRef, err := parseCompareURL(compareURL)
+	host, projectPath, baseCommit, headCommit, err := parseCompareURL(compareURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to parse GitLab compare URL: %w", err)
 	}
 
-	slog.Debug("Parsed compare URL", "host", host, "project", projectPath, "base", baseRef, "head", headRef)
+	slog.Debug("Parsed compare URL", "host", host, "project", projectPath, "base", baseCommit, "head", headCommit)
 
 	// URL-encode project path for API calls
 	encodedPath := urlEncodeProjectPath(projectPath)
 
-	// Fetch documentation
-	documentation, err := fetchDocumentation(f.client, host, projectPath, f.config)
-	if err != nil {
-		slog.Debug("Failed to fetch documentation (non-fatal)", "error", err)
-		documentation = nil
-	}
-
 	// Fetch comparison and enrich commits with MR metadata and QE labels
-	comparison, err := fetchDiff(f.client, encodedPath, baseRef, headRef, compareURL)
+	comparison, err := fetchDiff(f.client, encodedPath, baseCommit, headCommit, compareURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch and enrich comparison: %w", err)
 	}
@@ -78,6 +72,20 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 		return nil, nil, nil, fmt.Errorf("failed to fetch user guidance: %w", err)
 	}
 
+	// Fetch documentation
+	docSource := newDocumentationSource(f.client, host, projectPath)
+	owner, name := splitProjectPath(projectPath)
+	baseRepo := types.Repository{
+		Owner: owner,
+		Name:  name,
+		URL:   extractRepoURL(compareURL),
+	}
+	docFetcher := shared.NewDocumentationFetcher(docSource, baseRepo, f.config)
+	documentation, err := docFetcher.FetchAllDocs(context.Background())
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to fetch documentation: %w", err)
+	}
+
 	slog.Debug("Release data fetched successfully",
 		"commit_entries", len(comparison.Commits),
 		"user_guidance_items", len(userGuidance),
@@ -85,11 +93,6 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 		"has_documentation", documentation != nil)
 
 	return comparison, userGuidance, documentation, nil
-}
-
-// IsGitLabCompareURL checks if a URL is a GitLab compare URL
-func IsGitLabCompareURL(url string) bool {
-	return gitlabCompareRegex.MatchString(url)
 }
 
 // parseCompareURL extracts host, project path, baseRef, and headRef from GitLab compare URL
@@ -119,7 +122,18 @@ func extractRepoURL(compareURL string) string {
 	return compareURL
 }
 
-// urlEncodeProjectPath URL-encodes a GitLab project path for API calls
+// splitProjectPath splits GitLab project path into owner and name
+// For "group/repo" returns ("group", "repo")
+// For "group/subgroup/repo" returns ("group/subgroup", "repo")
+// For "repo" returns ("", "repo")
+func splitProjectPath(projectPath string) (owner, name string) {
+	lastSlash := strings.LastIndex(projectPath, "/")
+	if lastSlash == -1 {
+		return "", projectPath
+	}
+	return projectPath[:lastSlash], projectPath[lastSlash+1:]
+}
+
 func urlEncodeProjectPath(projectPath string) string {
 	return url.PathEscape(projectPath)
 }

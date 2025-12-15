@@ -17,11 +17,11 @@ func TestTruncateDocumentation(t *testing.T) {
 			},
 			MainDocContent: "# Main README\n\nThis is the entry point.",
 			MainDocFile:    "README.md",
-			LinkedDocs: map[string]string{
+			AdditionalDocsContent: map[string]string{
 				"CONTRIBUTING.md": "# Contributing\n\nContribution guidelines.",
 				"SECURITY.md":     "# Security\n\nSecurity policy.",
 			},
-			LinkedDocsOrder: []string{"CONTRIBUTING.md", "SECURITY.md"},
+			AdditionalDocsOrder: []string{"CONTRIBUTING.md", "SECURITY.md"},
 		},
 	}
 
@@ -73,10 +73,10 @@ func TestTruncateDocumentation(t *testing.T) {
 			}
 
 			// Check linked docs based on truncation level
-			hasLinkedDocs := len(resultDoc.LinkedDocs) > 0
-			if hasLinkedDocs != tt.expectedHasLinked {
+			hasAdditionalDocs := len(resultDoc.AdditionalDocsContent) > 0
+			if hasAdditionalDocs != tt.expectedHasLinked {
 				t.Errorf("%s: expected hasLinkedDocs=%v, got %v (count=%d)",
-					tt.description, tt.expectedHasLinked, hasLinkedDocs, len(resultDoc.LinkedDocs))
+					tt.description, tt.expectedHasLinked, hasAdditionalDocs, len(resultDoc.AdditionalDocsContent))
 			}
 		})
 	}
@@ -131,21 +131,21 @@ func TestTruncateDocumentationPreservesOriginal(t *testing.T) {
 			},
 			MainDocContent: "# README",
 			MainDocFile:    "README.md",
-			LinkedDocs: map[string]string{
+			AdditionalDocsContent: map[string]string{
 				"GUIDE.md": "# Guide",
 			},
-			LinkedDocsOrder: []string{"GUIDE.md"},
+			AdditionalDocsOrder: []string{"GUIDE.md"},
 		},
 	}
 
 	// Store original values
-	originalLinkedDocsCount := len(original[0].LinkedDocs)
+	originalLinkedDocsCount := len(original[0].AdditionalDocsContent)
 
 	// Truncate with high level
 	TruncateDocumentation(original, LevelHigh)
 
 	// Verify original is unchanged
-	if len(original[0].LinkedDocs) != originalLinkedDocsCount {
+	if len(original[0].AdditionalDocsContent) != originalLinkedDocsCount {
 		t.Error("Truncation modified the original documentation (should create a copy)")
 	}
 }

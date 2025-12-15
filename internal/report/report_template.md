@@ -139,9 +139,16 @@ The LLM was informed about the truncation and used file metadata, preserved crit
 {{- range .Documentation}}
 {{- $doc := .}}
 {{docFileInfo .MainDocFile .Repository.URL .Repository.DefaultBranch .MainDocContent}}
-{{- range $filename := .LinkedDocsOrder}}
-{{- if index $doc.LinkedDocs $filename}}
-{{docFileInfo $filename $doc.Repository.URL $doc.Repository.DefaultBranch (index $doc.LinkedDocs $filename)}}
+{{- range $filename := .AdditionalDocsOrder}}
+{{- if index $doc.AdditionalDocsContent $filename}}
+{{docFileInfo $filename $doc.Repository.URL $doc.Repository.DefaultBranch (index $doc.AdditionalDocsContent $filename)}}
+{{- end}}
+{{- end}}
+{{- if .FailedAdditionalDocs}}
+
+⚠️ **Failed to fetch the following additional documentation:**
+{{- range $displayName, $errorMsg := .FailedAdditionalDocs}}
+- **{{$displayName}}**: {{$errorMsg}}
 {{- end}}
 {{- end}}
 {{- end}}

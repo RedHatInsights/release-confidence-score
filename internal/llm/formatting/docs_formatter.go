@@ -30,8 +30,8 @@ func FormatDocumentations(docsList []*types.Documentation) string {
 		result.WriteString(adjustMarkdownHeadingLevels(docs.MainDocContent, headingIncrement))
 		result.WriteString("\n\n")
 
-		for _, displayName := range docs.LinkedDocsOrder {
-			if content, exists := docs.LinkedDocs[displayName]; exists {
+		for _, displayName := range docs.AdditionalDocsOrder {
+			if content, exists := docs.AdditionalDocsContent[displayName]; exists {
 				result.WriteString("### " + displayName + " (" + repoName + ")\n\n")
 				result.WriteString(adjustMarkdownHeadingLevels(content, headingIncrement))
 				result.WriteString("\n\n")

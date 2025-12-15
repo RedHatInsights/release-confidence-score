@@ -14,6 +14,24 @@ type Comparison struct {
 	Stats   ComparisonStats // Statistics about the comparison
 }
 
+// ComparisonStats represents statistics about the comparison
+type ComparisonStats struct {
+	TotalFiles     int
+	TotalAdditions int
+	TotalDeletions int
+	TotalChanges   int
+}
+
+// Commit represents a single commit with enriched metadata
+type Commit struct {
+	SHA            string // Full commit SHA
+	ShortSHA       string // Short SHA for display
+	Message        string // Commit message (first line only)
+	Author         string // Author name
+	PRNumber       int    // Associated PR number (0 if none)
+	QETestingLabel string // QE testing label status: "qe-tested", "needs-qe-testing", or empty
+}
+
 // FileChange represents a file that was changed in a comparison
 type FileChange struct {
 	Filename         string
@@ -23,14 +41,6 @@ type FileChange struct {
 	Changes          int
 	Patch            string
 	PreviousFilename string // For renames
-}
-
-// ComparisonStats represents statistics about the comparison
-type ComparisonStats struct {
-	TotalFiles     int
-	TotalAdditions int
-	TotalDeletions int
-	TotalChanges   int
 }
 
 // Repository represents basic repository information
@@ -43,11 +53,12 @@ type Repository struct {
 
 // Documentation represents repository documentation
 type Documentation struct {
-	MainDocContent  string
-	MainDocFile     string
-	LinkedDocs      map[string]string
-	LinkedDocsOrder []string
-	Repository      Repository
+	MainDocContent        string
+	MainDocFile           string
+	AdditionalDocsContent map[string]string // Successfully fetched linked docs: display name -> content
+	AdditionalDocsOrder   []string          // Order of successfully fetched docs
+	FailedAdditionalDocs  map[string]string // Failed linked docs: display name -> error message
+	Repository            Repository
 }
 
 // UserGuidance represents a complete user guidance with metadata for reporting
@@ -57,14 +68,4 @@ type UserGuidance struct {
 	Date         time.Time // When it was posted
 	CommentURL   string    // Direct link to the comment
 	IsAuthorized bool      // Whether the author had permission to post
-}
-
-// Commit represents a single commit with enriched metadata
-type Commit struct {
-	SHA            string // Full commit SHA
-	ShortSHA       string // Short SHA for display
-	Message        string // Commit message (first line only)
-	Author         string // Author name
-	PRNumber       int    // Associated PR number (0 if none)
-	QETestingLabel string // QE testing label status: "qe-tested", "needs-qe-testing", or empty
 }

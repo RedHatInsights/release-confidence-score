@@ -386,20 +386,20 @@ func TruncateDocumentation(docs []*types.Documentation, level string) []*types.D
 
 		// Create a copy with linked docs removed
 		truncated := &types.Documentation{
-			Repository:      doc.Repository,
-			MainDocContent:  doc.MainDocContent,
-			MainDocFile:     doc.MainDocFile,
-			LinkedDocs:      make(map[string]string),
-			LinkedDocsOrder: []string{},
+			Repository:            doc.Repository,
+			MainDocContent:        doc.MainDocContent,
+			MainDocFile:           doc.MainDocFile,
+			AdditionalDocsContent: make(map[string]string),
+			AdditionalDocsOrder:   []string{},
 		}
 
 		result[i] = truncated
 
-		if len(doc.LinkedDocs) > 0 {
+		if len(doc.AdditionalDocsContent) > 0 {
 			slog.Debug("Truncated documentation",
 				"level", level,
 				"repo", doc.Repository.URL,
-				"removed_linked_docs", len(doc.LinkedDocs))
+				"removed_additional_docs", len(doc.AdditionalDocsContent))
 		}
 	}
 
