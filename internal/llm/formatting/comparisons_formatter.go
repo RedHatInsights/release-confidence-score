@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 )
 
@@ -37,7 +38,8 @@ func FormatComparisons(comparisons []*types.Comparison) string {
 				author = "Unknown"
 			}
 
-			result.WriteString(fmt.Sprintf("- %s (%s)\n", message, author))
+			qeLabel := formatQELabel(commit.QETestingLabel)
+			result.WriteString(fmt.Sprintf("- %s (%s)%s\n", message, author, qeLabel))
 		}
 		result.WriteString("\n")
 
@@ -79,4 +81,16 @@ func FormatComparisons(comparisons []*types.Comparison) string {
 	}
 
 	return result.String()
+}
+
+// formatQELabel returns a formatted QE label suffix for commit lines
+func formatQELabel(label string) string {
+	switch label {
+	case shared.LabelQETested:
+		return " [QE Tested]"
+	case shared.LabelNeedsQETesting:
+		return " [Needs QE Testing]"
+	default:
+		return ""
+	}
 }

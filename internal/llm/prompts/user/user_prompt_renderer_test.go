@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 	"release-confidence-score/internal/llm/truncation"
 )
@@ -87,7 +86,6 @@ func TestRenderUserPrompt(t *testing.T) {
 		diff               string
 		documentation      string
 		userGuidance       []types.UserGuidance
-		qeTesting          *shared.TestingCommits
 		truncationMetadata truncation.TruncationMetadata
 		expectInOutput     []string
 		expectNotInOutput  []string
@@ -97,7 +95,6 @@ func TestRenderUserPrompt(t *testing.T) {
 			diff:          "diff content",
 			documentation: "",
 			userGuidance:  nil,
-			qeTesting:     nil,
 			truncationMetadata: truncation.TruncationMetadata{
 				Truncated: false,
 			},
@@ -110,7 +107,6 @@ func TestRenderUserPrompt(t *testing.T) {
 			expectNotInOutput: []string{
 				"Truncation",
 				"Additional Analysis Guidance",
-				"QE Testing Status",
 				"Documentation",
 			},
 		},
@@ -119,7 +115,6 @@ func TestRenderUserPrompt(t *testing.T) {
 			diff:          "diff content",
 			documentation: "# Documentation\n\nThis is the documentation.",
 			userGuidance:  nil,
-			qeTesting:     nil,
 			truncationMetadata: truncation.TruncationMetadata{
 				Truncated: false,
 			},
@@ -170,97 +165,11 @@ func TestRenderUserPrompt(t *testing.T) {
 			},
 		},
 		{
-			name: "with QE testing - tested commits",
-			diff: "diff content",
-			qeTesting: &shared.TestingCommits{
-				Tested: []shared.CommitsByRepo{
-					{
-						RepoURL: "https://github.com/user/repo",
-						Commits: []string{
-							"abc123 - Fix bug",
-							"def456 - Add feature",
-						},
-					},
-				},
-			},
-			truncationMetadata: truncation.TruncationMetadata{
-				Truncated: false,
-			},
-			expectInOutput: []string{
-				"QE Testing Status",
-				"QE Tested Commits",
-				"https://github.com/user/repo",
-				"abc123 - Fix bug",
-				"def456 - Add feature",
-			},
-		},
-		{
-			name: "with QE testing - needs testing commits",
-			diff: "diff content",
-			qeTesting: &shared.TestingCommits{
-				NeedsTesting: []shared.CommitsByRepo{
-					{
-						RepoURL: "https://github.com/user/repo",
-						Commits: []string{
-							"ghi789 - New feature",
-						},
-					},
-				},
-			},
-			truncationMetadata: truncation.TruncationMetadata{
-				Truncated: false,
-			},
-			expectInOutput: []string{
-				"QE Testing Status",
-				"Needs QE Testing Commits",
-				"https://github.com/user/repo",
-				"ghi789 - New feature",
-				"Evaluate confidence impact",
-			},
-		},
-		{
-			name: "with QE testing - both tested and needs testing",
-			diff: "diff content",
-			qeTesting: &shared.TestingCommits{
-				Tested: []shared.CommitsByRepo{
-					{
-						RepoURL: "https://github.com/user/repo1",
-						Commits: []string{"abc123 - Tested"},
-					},
-				},
-				NeedsTesting: []shared.CommitsByRepo{
-					{
-						RepoURL: "https://github.com/user/repo2",
-						Commits: []string{"def456 - Needs testing"},
-					},
-				},
-			},
-			truncationMetadata: truncation.TruncationMetadata{
-				Truncated: false,
-			},
-			expectInOutput: []string{
-				"QE Tested Commits",
-				"repo1",
-				"abc123 - Tested",
-				"Needs QE Testing Commits",
-				"repo2",
-				"def456 - Needs testing",
-			},
-		},
-		{
 			name:          "full prompt with all features",
 			diff:          "comprehensive diff content",
 			documentation: "Complete documentation",
 			userGuidance: []types.UserGuidance{
 				{Content: "Important guidance", IsAuthorized: true},
-			},
-			qeTesting: &shared.TestingCommits{
-				Tested: []shared.CommitsByRepo{
-					{
-						RepoURL: "https://github.com/user/repo",
-						Commits: []string{"abc123 - Fix"},
-					},
-				},
 			},
 			truncationMetadata: truncation.TruncationMetadata{
 				Truncated:      true,
@@ -276,9 +185,6 @@ func TestRenderUserPrompt(t *testing.T) {
 				"50/200",
 				"Additional Analysis Guidance",
 				"Important guidance",
-				"QE Testing Status",
-				"QE Tested Commits",
-				"abc123 - Fix",
 				"## Documentation",
 				"Complete documentation",
 			},
@@ -287,7 +193,7 @@ func TestRenderUserPrompt(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result, err := RenderUserPrompt(tt.diff, tt.documentation, tt.userGuidance, tt.qeTesting, tt.truncationMetadata)
+			result, err := RenderUserPrompt(tt.diff, tt.documentation, tt.userGuidance, tt.truncationMetadata)
 			if err != nil {
 				t.Fatalf("RenderUserPrompt() error = %v", err)
 			}
@@ -316,7 +222,7 @@ func TestRenderUserPrompt(t *testing.T) {
 func TestRenderUserPromptTemplateFormat(t *testing.T) {
 	// Test that the template produces valid markdown structure
 	diff := "sample diff"
-	result, err := RenderUserPrompt(diff, "", nil, nil, truncation.TruncationMetadata{})
+	result, err := RenderUserPrompt(diff, "", nil, truncation.TruncationMetadata{})
 	if err != nil {
 		t.Fatalf("RenderUserPrompt() error = %v", err)
 	}
@@ -343,7 +249,7 @@ func TestRenderUserPromptNoTruncationWhenNotTruncated(t *testing.T) {
 		FilesTruncated: 20,
 	}
 
-	result, err := RenderUserPrompt(diff, "", nil, nil, truncationMetadata)
+	result, err := RenderUserPrompt(diff, "", nil, truncationMetadata)
 	if err != nil {
 		t.Fatalf("RenderUserPrompt() error = %v", err)
 	}
@@ -365,12 +271,12 @@ func TestRenderUserPromptConsistency(t *testing.T) {
 		{Content: "consistent guidance", IsAuthorized: true},
 	}
 
-	result1, err := RenderUserPrompt(diff, documentation, userGuidance, nil, truncation.TruncationMetadata{})
+	result1, err := RenderUserPrompt(diff, documentation, userGuidance, truncation.TruncationMetadata{})
 	if err != nil {
 		t.Fatalf("RenderUserPrompt() first call error = %v", err)
 	}
 
-	result2, err := RenderUserPrompt(diff, documentation, userGuidance, nil, truncation.TruncationMetadata{})
+	result2, err := RenderUserPrompt(diff, documentation, userGuidance, truncation.TruncationMetadata{})
 	if err != nil {
 		t.Fatalf("RenderUserPrompt() second call error = %v", err)
 	}

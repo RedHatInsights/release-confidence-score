@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"gitlab.com/gitlab-org/api/client-go"
+	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 )
 
@@ -117,31 +118,11 @@ func buildCommitEntry(commit *gitlab.Commit, client *gitlab.Client, projectPath,
 }
 
 // extractQELabel extracts the QE testing label from a GitLab MR
-// Returns "qe-tested", "needs-qe-testing", or empty string
 func extractQELabel(mr *gitlab.MergeRequest) string {
-	if mr == nil || mr.Labels == nil {
+	if mr == nil {
 		return ""
 	}
-
-	hasQeTested := false
-	hasNeedsQETesting := false
-
-	for _, label := range mr.Labels {
-		labelLower := strings.ToLower(label)
-		if labelLower == "rcs/qe-tested" {
-			hasQeTested = true
-		} else if labelLower == "rcs/needs-qe-testing" {
-			hasNeedsQETesting = true
-		}
-	}
-
-	// Priority logic: qe-tested takes precedence over needs-qe-testing
-	if hasQeTested {
-		return "qe-tested"
-	} else if hasNeedsQETesting {
-		return "needs-qe-testing"
-	}
-	return ""
+	return shared.ExtractQELabel(mr.Labels)
 }
 
 // mrCache caches GitLab API responses to avoid duplicate calls

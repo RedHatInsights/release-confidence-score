@@ -27,31 +27,6 @@ The following guidance was provided to guide your analysis:
 Please incorporate this guidance into your analysis.
 
 {{- end}}
-{{- define "qeCommitList"}}
-{{- range .}}
-**Repository**: {{.RepoURL}}
-{{- range .Commits}}
-- {{.}}
-{{- end}}
-{{- end}}
-{{- end}}
-
-{{- if .QETesting}}
-## QE Testing Status
-
-{{- if .QETesting.Tested}}
-### QE Tested Commits
-{{- template "qeCommitList" .QETesting.Tested}}
-{{- end}}
-
-{{- if .QETesting.NeedsTesting}}
-### Needs QE Testing Commits
-{{- template "qeCommitList" .QETesting.NeedsTesting}}
-{{- end}}
-
-*Evaluate confidence impact based on testing status and the criticality of each change.*
-
-{{- end}}
 
 {{- if .Documentation}}
 ## Documentation

@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 	"release-confidence-score/internal/llm/truncation"
 )
@@ -50,9 +51,9 @@ func escapePipes(s string) string {
 
 func qeStatus(label string) string {
 	switch label {
-	case "qe-tested":
+	case shared.LabelQETested:
 		return "✅ Tested"
-	case "needs-qe-testing":
+	case shared.LabelNeedsQETesting:
 		return "⚠️ Needs Testing"
 	default:
 		return "N/A"

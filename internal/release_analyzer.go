@@ -9,7 +9,6 @@ import (
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/github"
 	"release-confidence-score/internal/git/gitlab"
-	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 	llmerrors "release-confidence-score/internal/llm/errors"
 	"release-confidence-score/internal/llm/formatting"
@@ -191,12 +190,9 @@ func (ra *ReleaseAnalyzer) analyze(
 	userGuidance []types.UserGuidance,
 	documentation []*types.Documentation,
 ) (float64, string, error) {
-	// Process QE testing labels from comparisons
-	qeTestingCommits := shared.BuildTestingCommits(comparisons)
-
 	// Analyze with progressive truncation retry
 	response, truncationInfo, err := ra.analyzeWithProgressiveTruncation(
-		comparisons, documentation, userGuidance, qeTestingCommits)
+		comparisons, documentation, userGuidance)
 	if err != nil {
 		return 0, "", err
 	}
@@ -233,13 +229,12 @@ func (ra *ReleaseAnalyzer) analyzeWithProgressiveTruncation(
 	comparisons []*types.Comparison,
 	documentation []*types.Documentation,
 	allUserGuidance []types.UserGuidance,
-	qeTestingCommits *shared.TestingCommits,
 ) (string, *truncation.TruncationMetadata, error) {
 	// Format data and prepare initial prompt
 	diffContent := formatting.FormatComparisons(comparisons)
 	documentationText := formatting.FormatDocumentations(documentation)
 
-	userPrompt, err := user.RenderUserPrompt(diffContent, documentationText, allUserGuidance, qeTestingCommits, truncation.TruncationMetadata{})
+	userPrompt, err := user.RenderUserPrompt(diffContent, documentationText, allUserGuidance, truncation.TruncationMetadata{})
 	if err != nil {
 		return "", nil, fmt.Errorf("failed to format initial user prompt: %w", err)
 	}
@@ -279,7 +274,7 @@ func (ra *ReleaseAnalyzer) analyzeWithProgressiveTruncation(
 		truncatedDiff := formatting.FormatComparisons(truncatedComparisons)
 		truncatedDocText := formatting.FormatDocumentations(truncatedDocs)
 
-		userPrompt, promptErr := user.RenderUserPrompt(truncatedDiff, truncatedDocText, allUserGuidance, qeTestingCommits, combinedMetadata)
+		userPrompt, promptErr := user.RenderUserPrompt(truncatedDiff, truncatedDocText, allUserGuidance, combinedMetadata)
 		if promptErr != nil {
 			return "", nil, fmt.Errorf("failed to format user prompt with %s truncation: %w", levelName, promptErr)
 		}

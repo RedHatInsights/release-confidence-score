@@ -310,4 +310,56 @@ func TestFormatComparisons(t *testing.T) {
 			t.Error("missing third commit")
 		}
 	})
+
+	t.Run("commits with QE testing labels", func(t *testing.T) {
+		comparison := &types.Comparison{
+			RepoURL: "https://github.com/test/repo",
+			Commits: []types.Commit{
+				{Message: "Fix security bug", Author: "Alice", QETestingLabel: "rcs/qe-tested"},
+				{Message: "Add new feature", Author: "Bob", QETestingLabel: "rcs/needs-qe-testing"},
+				{Message: "Update docs", Author: "Charlie", QETestingLabel: ""},
+			},
+			Files: []types.FileChange{
+				{Filename: "file.go", Status: "modified", Patch: "diff"},
+			},
+			Stats: types.ComparisonStats{TotalFiles: 1},
+		}
+
+		result := FormatComparisons([]*types.Comparison{comparison})
+
+		if !strings.Contains(result, "Fix security bug (Alice) [QE Tested]") {
+			t.Error("missing QE Tested label for first commit")
+		}
+		if !strings.Contains(result, "Add new feature (Bob) [Needs QE Testing]") {
+			t.Error("missing Needs QE Testing label for second commit")
+		}
+		if !strings.Contains(result, "Update docs (Charlie)") {
+			t.Error("missing third commit")
+		}
+		// Third commit should NOT have any QE label
+		if strings.Contains(result, "Update docs (Charlie) [") {
+			t.Error("third commit should not have QE label")
+		}
+	})
+}
+
+func TestFormatQELabel(t *testing.T) {
+	tests := []struct {
+		label    string
+		expected string
+	}{
+		{"rcs/qe-tested", " [QE Tested]"},
+		{"rcs/needs-qe-testing", " [Needs QE Testing]"},
+		{"", ""},
+		{"unknown-label", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.label, func(t *testing.T) {
+			result := formatQELabel(tt.label)
+			if result != tt.expected {
+				t.Errorf("formatQELabel(%q) = %q, want %q", tt.label, result, tt.expected)
+			}
+		})
+	}
 }
