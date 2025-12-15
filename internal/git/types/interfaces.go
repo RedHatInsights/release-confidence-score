@@ -18,14 +18,11 @@ type GitProvider interface {
 	Name() string
 }
 
-// RepositoryClient defines the interface for platform-specific repository operations
-type RepositoryClient interface {
+// DocumentationSource defines the interface for fetching documentation from a repository
+type DocumentationSource interface {
 	// GetDefaultBranch returns the default branch name for the repository
 	GetDefaultBranch(ctx context.Context) (string, error)
 
 	// FetchFileContent fetches the content of a file from the repository
 	FetchFileContent(ctx context.Context, path, ref string) (string, error)
-
-	// GetRepositoryInfo returns the repository metadata
-	GetRepositoryInfo() Repository
 }

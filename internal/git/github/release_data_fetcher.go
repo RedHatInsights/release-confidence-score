@@ -7,9 +7,11 @@ import (
 	"regexp"
 	"strings"
 
-	githubapi "github.com/google/go-github/v79/github"
 	"release-confidence-score/internal/config"
+	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
+
+	githubapi "github.com/google/go-github/v79/github"
 )
 
 // githubCompareRegex matches GitHub compare URLs and extracts components
@@ -36,7 +38,7 @@ func (f *Fetcher) Name() string {
 
 // IsCompareURL checks if a URL is a valid GitHub compare URL
 func (f *Fetcher) IsCompareURL(url string) bool {
-	return IsGitHubCompareURL(url)
+	return githubCompareRegex.MatchString(url)
 }
 
 // FetchReleaseData fetches all release data for a GitHub compare URL
@@ -45,22 +47,15 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	slog.Debug("Fetching GitHub release data", "url", compareURL)
 
 	// Parse compare URL
-	owner, repo, base, head, err := parseCompareURL(compareURL)
+	owner, repo, baseCommit, headCommit, err := parseCompareURL(compareURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to parse GitHub compare URL: %w", err)
 	}
 
-	slog.Debug("Parsed compare URL", "owner", owner, "repo", repo, "base", base, "head", head)
-
-	// Fetch documentation
-	documentation, err := fetchDocumentation(f.client, owner, repo, f.config)
-	if err != nil {
-		slog.Debug("Failed to fetch documentation (non-fatal)", "error", err)
-		documentation = nil
-	}
+	slog.Debug("Parsed compare URL", "owner", owner, "repo", repo, "base", baseCommit, "head", headCommit)
 
 	// Fetch comparison and enrich commits with PR metadata and QE labels
-	comparison, err := fetchDiff(context.Background(), f.client, owner, repo, base, head, compareURL)
+	comparison, err := fetchDiff(context.Background(), f.client, owner, repo, baseCommit, headCommit, compareURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch and enrich comparison: %w", err)
 	}
@@ -71,6 +66,19 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 		return nil, nil, nil, fmt.Errorf("failed to fetch user guidance: %w", err)
 	}
 
+	// Fetch documentation
+	docSource := newDocumentationSource(f.client, owner, repo)
+	baseRepo := types.Repository{
+		Owner: owner,
+		Name:  repo,
+		URL:   extractRepoURL(compareURL),
+	}
+	docFetcher := shared.NewDocumentationFetcher(docSource, baseRepo, f.config)
+	documentation, err := docFetcher.FetchAllDocs(context.Background())
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("failed to fetch documentation: %w", err)
+	}
+
 	slog.Debug("Release data fetched successfully",
 		"commit_entries", len(comparison.Commits),
 		"user_guidance_items", len(userGuidance),
@@ -78,11 +86,6 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 		"has_documentation", documentation != nil)
 
 	return comparison, userGuidance, documentation, nil
-}
-
-// IsGitHubCompareURL checks if a URL is a GitHub compare URL
-func IsGitHubCompareURL(url string) bool {
-	return githubCompareRegex.MatchString(url)
 }
 
 // parseCompareURL extracts owner, repo, baseCommit, and headCommit from GitHub compare URL

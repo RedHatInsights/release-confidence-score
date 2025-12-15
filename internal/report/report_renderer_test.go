@@ -696,10 +696,10 @@ func TestGenerateReportWithDocumentation(t *testing.T) {
 				URL:           "https://github.com/user/repo",
 				DefaultBranch: "main",
 			},
-			MainDocFile:     "README.md",
-			MainDocContent:  "# Project\n\nDescription",
-			LinkedDocsOrder: []string{"CONTRIBUTING.md", "https://example.com/external-doc.md"},
-			LinkedDocs: map[string]string{
+			MainDocFile:         "README.md",
+			MainDocContent:      "# Project\n\nDescription",
+			AdditionalDocsOrder: []string{"CONTRIBUTING.md", "https://example.com/external-doc.md"},
+			AdditionalDocsContent: map[string]string{
 				"CONTRIBUTING.md":                     "Contribution guidelines",
 				"https://example.com/external-doc.md": "External documentation",
 			},

@@ -249,11 +249,11 @@ func TestFormatDocumentations(t *testing.T) {
 				{
 					MainDocFile:    "README.md",
 					MainDocContent: "# Main\nMain content",
-					LinkedDocs: map[string]string{
+					AdditionalDocsContent: map[string]string{
 						"CONTRIBUTING.md": "# Contributing\nGuidelines",
 						"INSTALL.md":      "# Installation\nSteps",
 					},
-					LinkedDocsOrder: []string{"CONTRIBUTING.md", "INSTALL.md"},
+					AdditionalDocsOrder: []string{"CONTRIBUTING.md", "INSTALL.md"},
 					Repository: types.Repository{
 						Owner: "user",
 						Name:  "repo",
