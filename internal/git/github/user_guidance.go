@@ -22,7 +22,7 @@ func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo s
 	var allGuidance []types.UserGuidance
 
 	// Track which PRs we've already processed to avoid duplicates
-	processedPRs := make(map[int]bool)
+	processedPRs := make(map[int64]bool)
 
 	// Extract guidance from each unique PR
 	for _, commit := range comparison.Commits {
@@ -33,7 +33,7 @@ func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo s
 		processedPRs[commit.PRNumber] = true
 
 		// Get PR object
-		pr, _, err := client.PullRequests.Get(ctx, owner, repo, commit.PRNumber)
+		pr, _, err := client.PullRequests.Get(ctx, owner, repo, int(commit.PRNumber))
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch PR #%d for guidance extraction: %w", commit.PRNumber, err)
 		}

@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/google/go-github/v80 v80.0.0
-	gitlab.com/gitlab-org/api/client-go v0.161.1
+	gitlab.com/gitlab-org/api/client-go v1.8.1
 )
 
 require (

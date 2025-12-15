@@ -47,7 +47,7 @@ func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 	}, nil
 }
 
-func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int, postToMR bool) (float64, string, error) {
+func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int64, postToMR bool) (float64, string, error) {
 	slog.Debug("Starting release analysis in app-interface mode")
 
 	// Get diff URLs and user guidance from merge request notes

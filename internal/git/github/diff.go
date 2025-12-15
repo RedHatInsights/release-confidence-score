@@ -95,7 +95,7 @@ func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, clie
 	}
 
 	slog.Debug("Found PR for commit", "commit", entry.ShortSHA, "pr", prNumber)
-	entry.PRNumber = prNumber
+	entry.PRNumber = int64(prNumber)
 
 	// Get PR object (cached)
 	pr, err := cache.getOrFetchPR(ctx, client, owner, repo, prNumber)

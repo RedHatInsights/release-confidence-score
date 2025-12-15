@@ -123,7 +123,7 @@ func TestAuthorizationStatus(t *testing.T) {
 func TestPRLink(t *testing.T) {
 	tests := []struct {
 		name     string
-		prNumber int
+		prNumber int64
 		repoURL  string
 		expected string
 	}{

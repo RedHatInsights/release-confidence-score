@@ -10,7 +10,7 @@ import (
 type Args struct {
 	Mode            string
 	CompareLinks    []string
-	MergeRequestIID int
+	MergeRequestIID int64
 	PostToMR        bool
 	ShowHelp        bool
 }
@@ -27,8 +27,8 @@ func Parse() (*Args, error) {
 	flag.StringVar(&compareLinksStr, "compare-links", "", "Comma-separated list of GitHub/GitLab compare URLs (standalone mode)")
 	flag.StringVar(&compareLinksStr, "c", "", "Comma-separated compare URLs (shorthand)")
 
-	flag.IntVar(&args.MergeRequestIID, "merge-request-iid", 0, "App-interface merge request IID (app-interface mode)")
-	flag.IntVar(&args.MergeRequestIID, "mr", 0, "Merge request IID (shorthand)")
+	flag.Int64Var(&args.MergeRequestIID, "merge-request-iid", 0, "App-interface merge request IID (app-interface mode)")
+	flag.Int64Var(&args.MergeRequestIID, "mr", 0, "Merge request IID (shorthand)")
 
 	flag.BoolVar(&args.PostToMR, "post-to-mr", false, "Post report as comment to merge request (app-interface mode only)")
 	flag.BoolVar(&args.PostToMR, "p", false, "Post to MR (shorthand)")

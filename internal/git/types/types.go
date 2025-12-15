@@ -28,7 +28,7 @@ type Commit struct {
 	ShortSHA       string // Short SHA for display
 	Message        string // Commit message (first line only)
 	Author         string // Author name
-	PRNumber       int    // Associated PR number (0 if none)
+	PRNumber       int64  // Associated PR/MR number (0 if none)
 	QETestingLabel string // QE testing label status: "qe-tested", "needs-qe-testing", or empty
 }
 

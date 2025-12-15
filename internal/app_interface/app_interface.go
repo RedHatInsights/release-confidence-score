@@ -28,7 +28,7 @@ const (
 var urlRegex = regexp.MustCompile(`(?m)^- (https?://\S+)$`)
 
 // GetDiffURLsAndUserGuidance fetches merge request notes and extracts diff URLs and user guidance
-func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, cfg *config.Config, mergeRequestIID int) ([]string, []types.UserGuidance, error) {
+func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, cfg *config.Config, mergeRequestIID int64) ([]string, []types.UserGuidance, error) {
 	notes, err := getAllMergeRequestNotes(client, mergeRequestIID)
 	if err != nil {
 		return nil, nil, err
@@ -45,7 +45,7 @@ func GetDiffURLsAndUserGuidance(client *gitlabapi.Client, cfg *config.Config, me
 }
 
 // getAllMergeRequestNotes fetches all notes for a merge request with automatic pagination
-func getAllMergeRequestNotes(client *gitlabapi.Client, mergeRequestIID int) ([]*gitlabapi.Note, error) {
+func getAllMergeRequestNotes(client *gitlabapi.Client, mergeRequestIID int64) ([]*gitlabapi.Note, error) {
 	orderBy := "created_at"
 	sort := "desc"
 	opts := &gitlabapi.ListMergeRequestNotesOptions{
@@ -100,7 +100,7 @@ func extractDiffURLsFromBot(notes []*gitlabapi.Note) ([]string, error) {
 }
 
 // extractUserGuidance extracts user guidance from merge request notes with full metadata
-func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitlabapi.Note) []types.UserGuidance {
+func extractUserGuidance(cfg *config.Config, mergeRequestIID int64, notes []*gitlabapi.Note) []types.UserGuidance {
 	var allGuidance []types.UserGuidance
 
 	// Build the merge request URL from config
@@ -134,7 +134,7 @@ func extractUserGuidance(cfg *config.Config, mergeRequestIID int, notes []*gitla
 }
 
 // PostReportToMR posts the release confidence score report to a GitLab merge request
-func PostReportToMR(client *gitlabapi.Client, report string, mrIID int) error {
+func PostReportToMR(client *gitlabapi.Client, report string, mrIID int64) error {
 	opts := &gitlabapi.CreateMergeRequestNoteOptions{
 		Body: &report,
 	}

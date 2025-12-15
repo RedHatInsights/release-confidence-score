@@ -21,7 +21,7 @@ func fetchUserGuidance(ctx context.Context, client *gitlab.Client, projectPath s
 	var allGuidance []types.UserGuidance
 
 	// Track which MRs we've already processed to avoid duplicates
-	processedMRs := make(map[int]bool)
+	processedMRs := make(map[int64]bool)
 
 	// Extract guidance from each unique MR
 	for _, commit := range comparison.Commits {
@@ -116,7 +116,7 @@ func extractUserGuidance(ctx context.Context, client *gitlab.Client, projectPath
 }
 
 // processNote processes a single note and returns user guidance if found
-func processNote(note *gitlab.Note, mrAuthor string, approvers []string, repoURL string, mrIID int) *types.UserGuidance {
+func processNote(note *gitlab.Note, mrAuthor string, approvers []string, repoURL string, mrIID int64) *types.UserGuidance {
 	guidanceContent, found := shared.ParseUserGuidance(note.Body)
 	if !found {
 		return nil
@@ -153,7 +153,7 @@ func isValidNote(note *gitlab.Note) bool {
 }
 
 // getMRApprovers returns the list of usernames who approved the MR
-func getMRApprovers(ctx context.Context, client *gitlab.Client, projectPath string, mrIID int) ([]string, error) {
+func getMRApprovers(ctx context.Context, client *gitlab.Client, projectPath string, mrIID int64) ([]string, error) {
 	// Get MR approval state
 	approvals, _, err := client.MergeRequestApprovals.GetConfiguration(projectPath, mrIID)
 	if err != nil {
@@ -179,7 +179,7 @@ func getMRApprovers(ctx context.Context, client *gitlab.Client, projectPath stri
 //
 // Note: GitLab's approval system is permission-based, so we don't need to check
 // additional authority levels - if they're in the approvers list, they're authorized.
-func isAuthorized(username, mrAuthor string, approvers []string, mrIID int) bool {
+func isAuthorized(username, mrAuthor string, approvers []string, mrIID int64) bool {
 	// Check if user is MR author
 	if username == mrAuthor {
 		slog.Debug("User authorized as MR author", "user", username, "mr_iid", mrIID)
