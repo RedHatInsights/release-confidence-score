@@ -6,9 +6,10 @@ import (
 	"log/slog"
 	"strings"
 
-	"github.com/google/go-github/v80/github"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
+
+	"github.com/google/go-github/v80/github"
 )
 
 // fetchDiff fetches comparison data from GitHub and enriches commits with PR metadata and QE labels
@@ -24,15 +25,12 @@ func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, he
 
 	slog.Debug("Fetched GitHub comparison", "commits", len(allCommits), "files", len(ghComparison.Files))
 
-	// Build repo URL
-	repoURL := fmt.Sprintf("https://github.com/%s/%s", owner, repo)
-
 	// Create internal cache to avoid duplicate API calls
 	cache := newPRCache()
 
 	// Initialize comparison with files and stats from GitHub
 	comparison := &types.Comparison{
-		RepoURL: repoURL,
+		RepoURL: fmt.Sprintf("https://github.com/%s/%s", owner, repo),
 		DiffURL: diffURL,
 		Commits: make([]types.Commit, 0, len(allCommits)),
 		Files:   convertFiles(ghComparison.Files),
@@ -41,12 +39,7 @@ func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, he
 
 	// Process each commit for enrichment (PR number, QE labels)
 	for _, commit := range allCommits {
-		if commit.SHA == nil {
-			continue
-		}
-
-		// Build commit entry with PR enrichment
-		commitEntry := buildCommitEntry(ctx, commit, client, owner, repo, repoURL, cache)
+		commitEntry := buildCommitEntry(ctx, commit, client, owner, repo, cache)
 		if commitEntry != nil {
 			comparison.Commits = append(comparison.Commits, *commitEntry)
 		}
@@ -58,8 +51,8 @@ func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, he
 }
 
 // buildCommitEntry creates a commit entry from a GitHub commit with PR enrichment
-func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, client *github.Client, owner, repo, repoURL string, cache *prCache) *types.Commit {
-	if commit.SHA == nil {
+func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, client *github.Client, owner, repo string, cache *prCache) *types.Commit {
+	if commit == nil || commit.SHA == nil || *commit.SHA == "" {
 		return nil
 	}
 
@@ -71,16 +64,13 @@ func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, clie
 	}
 
 	// Extract commit message (first line only)
-	if commit.Commit != nil && commit.Commit.Message != nil {
-		lines := strings.Split(*commit.Commit.Message, "\n")
-		if len(lines) > 0 {
-			entry.Message = strings.TrimSpace(lines[0])
-		}
+	if msg := commit.GetCommit().GetMessage(); msg != "" {
+		entry.Message = strings.TrimSpace(strings.SplitN(msg, "\n", 2)[0])
 	}
 
 	// Extract author name
-	if commit.Commit != nil && commit.Commit.Author != nil && commit.Commit.Author.Name != nil {
-		entry.Author = *commit.Commit.Author.Name
+	if name := commit.GetCommit().GetAuthor().GetName(); name != "" {
+		entry.Author = name
 	}
 
 	// Find PR for this commit (cached)
@@ -126,49 +116,20 @@ func extractQELabel(pr *github.PullRequest) string {
 }
 
 // prCache caches GitHub API responses to avoid duplicate calls
-// Internal to enrichment - not exposed outside this file
 type prCache struct {
-	commitToPR       map[string]int                          // "owner/repo/SHA" → PR number
-	prs              map[string]*github.PullRequest          // "owner/repo/123" → PR object
-	prIssueComments  map[string][]*github.IssueComment       // "owner/repo/123" → discussion comments
-	prReviewComments map[string][]*github.PullRequestComment // "owner/repo/123" → review comments
-	prReviews        map[string][]*github.PullRequestReview  // "owner/repo/123" → reviews
+	commitToPR map[string]int                 // "owner/repo/SHA" → PR number
+	prs        map[string]*github.PullRequest // "owner/repo/123" → PR object
 }
 
 func newPRCache() *prCache {
 	return &prCache{
-		commitToPR:       make(map[string]int),
-		prs:              make(map[string]*github.PullRequest),
-		prIssueComments:  make(map[string][]*github.IssueComment),
-		prReviewComments: make(map[string][]*github.PullRequestComment),
-		prReviews:        make(map[string][]*github.PullRequestReview),
+		commitToPR: make(map[string]int),
+		prs:        make(map[string]*github.PullRequest),
 	}
 }
 
 func cacheKey(owner, repo string, identifier interface{}) string {
 	return fmt.Sprintf("%s/%s/%v", owner, repo, identifier)
-}
-
-// getCommitPRNumber gets cached PR number for a commit (doesn't fetch if not in cache)
-func (c *prCache) getCommitPRNumber(commitSHA string) int {
-	// Extract owner/repo from the cache key if needed
-	// For now, we iterate through the cache
-	for key, prNumber := range c.commitToPR {
-		if strings.HasSuffix(key, "/"+commitSHA) {
-			return prNumber
-		}
-	}
-	return 0
-}
-
-// getPR gets cached PR object (doesn't fetch if not in cache)
-func (c *prCache) getPR(prNumber int) *github.PullRequest {
-	for _, pr := range c.prs {
-		if pr.GetNumber() == prNumber {
-			return pr
-		}
-	}
-	return nil
 }
 
 func (c *prCache) getOrFetchPRForCommit(ctx context.Context, client *github.Client, owner, repo, commitSHA string) (int, error) {
@@ -233,21 +194,19 @@ func (c *prCache) getOrFetchPR(ctx context.Context, client *github.Client, owner
 // fetchComparisonWithPagination fetches comparison data with full commit pagination
 // GitHub API limits commits per page, so we need to paginate to get all commits
 func fetchComparisonWithPagination(ctx context.Context, client *github.Client, owner, repo, base, head string) (*github.CommitsComparison, []*github.RepositoryCommit, error) {
-	page := 1
-	perPage := 100
 	var allCommits []*github.RepositoryCommit
 	var comparisonData *github.CommitsComparison
+	opts := &github.ListOptions{Page: 1, PerPage: 100}
 
 	for {
-		comparison, resp, err := client.Repositories.CompareCommits(ctx, owner, repo, base, head,
-			&github.ListOptions{Page: page, PerPage: perPage})
+		comparison, resp, err := client.Repositories.CompareCommits(ctx, owner, repo, base, head, opts)
 		if err != nil {
 			return nil, nil, fmt.Errorf("failed to fetch comparison from GitHub (page %d, owner=%s, repo=%s, base=%s, head=%s): %w",
-				page, owner, repo, base, head, err)
+				opts.Page, owner, repo, base, head, err)
 		}
 
 		// Store comparison data from first page
-		if page == 1 {
+		if opts.Page == 1 {
 			comparisonData = comparison
 		}
 
@@ -260,7 +219,7 @@ func fetchComparisonWithPagination(ctx context.Context, client *github.Client, o
 		if resp.NextPage == 0 {
 			break
 		}
-		page = resp.NextPage
+		opts.Page = resp.NextPage
 	}
 
 	return comparisonData, allCommits, nil
@@ -284,38 +243,15 @@ func convertFile(file *github.CommitFile) types.FileChange {
 	if file == nil {
 		return types.FileChange{}
 	}
-
-	change := types.FileChange{}
-
-	if file.Filename != nil {
-		change.Filename = *file.Filename
+	return types.FileChange{
+		Filename:         file.GetFilename(),
+		Status:           file.GetStatus(),
+		Additions:        file.GetAdditions(),
+		Deletions:        file.GetDeletions(),
+		Changes:          file.GetChanges(),
+		Patch:            file.GetPatch(),
+		PreviousFilename: file.GetPreviousFilename(),
 	}
-
-	if file.Status != nil {
-		change.Status = *file.Status
-	}
-
-	if file.Additions != nil {
-		change.Additions = *file.Additions
-	}
-
-	if file.Deletions != nil {
-		change.Deletions = *file.Deletions
-	}
-
-	if file.Changes != nil {
-		change.Changes = *file.Changes
-	}
-
-	if file.Patch != nil {
-		change.Patch = *file.Patch
-	}
-
-	if file.PreviousFilename != nil {
-		change.PreviousFilename = *file.PreviousFilename
-	}
-
-	return change
 }
 
 // calculateStats calculates comparison statistics from GitHub files
@@ -325,12 +261,11 @@ func calculateStats(files []*github.CommitFile) types.ComparisonStats {
 	}
 
 	for _, file := range files {
-		if file.Additions != nil {
-			stats.TotalAdditions += *file.Additions
+		if file == nil {
+			continue
 		}
-		if file.Deletions != nil {
-			stats.TotalDeletions += *file.Deletions
-		}
+		stats.TotalAdditions += file.GetAdditions()
+		stats.TotalDeletions += file.GetDeletions()
 	}
 
 	stats.TotalChanges = stats.TotalAdditions + stats.TotalDeletions

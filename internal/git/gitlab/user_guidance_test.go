@@ -316,16 +316,3 @@ func TestFetchUserGuidance_DuplicateMRs(t *testing.T) {
 	// Testing deduplication with actual MR fetching requires a mock GitLab client
 	t.Skip("Skipping - requires mock GitLab client to test deduplication logic")
 }
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > len(substr) && containsAt(s, substr, 0))
-}
-
-func containsAt(s, substr string, offset int) bool {
-	for i := offset; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

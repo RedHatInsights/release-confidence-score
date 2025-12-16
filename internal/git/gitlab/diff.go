@@ -1,55 +1,57 @@
 package gitlab
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 
-	"gitlab.com/gitlab-org/api/client-go"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
+
+	gitlab "gitlab.com/gitlab-org/api/client-go"
 )
 
 // fetchDiff fetches comparison data from GitLab and enriches commits with MR metadata and QE labels
 // Returns a complete Comparison with enriched commits, files, and stats
-func fetchDiff(client *gitlab.Client, projectPath, baseRef, headRef, compareURL string) (*types.Comparison, error) {
-	slog.Debug("Starting comparison fetch and enrichment", "project", projectPath, "base", baseRef, "head", headRef)
+func fetchDiff(ctx context.Context, client *gitlab.Client, host, projectPath, base, head, diffURL string) (*types.Comparison, error) {
+	slog.Debug("Starting comparison fetch and enrichment", "project", projectPath, "base", base, "head", head)
+
+	// URL-encode project path for API calls
+	encodedPath := url.PathEscape(projectPath)
 
 	// Fetch comparison
-	compare, _, err := client.Repositories.Compare(projectPath, &gitlab.CompareOptions{
-		From:     &baseRef,
-		To:       &headRef,
+	compareOpts := &gitlab.CompareOptions{
+		From:     &base,
+		To:       &head,
 		Straight: gitlab.Ptr(false), // Use three-dot comparison (like GitHub)
-	})
+	}
+	compare, _, err := client.Repositories.Compare(encodedPath, compareOpts, gitlab.WithContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch comparison: %w", err)
 	}
 
 	slog.Debug("GitLab comparison fetched", "commits", len(compare.Commits), "diffs", len(compare.Diffs))
 
-	// Build repo URL
-	repoURL := extractRepoURL(compareURL)
-
 	// Create internal cache to avoid duplicate API calls
 	cache := newMRCache()
 
+	// Convert diffs to files (calculates per-file stats once)
+	files := convertDiffs(compare.Diffs)
+
 	// Initialize comparison with files and stats from GitLab
 	comparison := &types.Comparison{
-		RepoURL: repoURL,
-		DiffURL: compareURL,
+		RepoURL: fmt.Sprintf("https://%s/%s", host, projectPath),
+		DiffURL: diffURL,
 		Commits: make([]types.Commit, 0, len(compare.Commits)),
-		Files:   convertDiffs(compare.Diffs),
-		Stats:   calculateStatsFromDiffs(compare.Diffs),
+		Files:   files,
+		Stats:   calculateStats(files),
 	}
 
 	// Process each commit for enrichment (MR number, QE labels)
 	for _, commit := range compare.Commits {
-		if commit == nil || commit.ID == "" {
-			continue
-		}
-
-		// Build commit entry with MR enrichment
-		commitEntry := buildCommitEntry(commit, client, projectPath, repoURL, cache)
+		commitEntry := buildCommitEntry(ctx, commit, client, encodedPath, cache)
 		if commitEntry != nil {
 			comparison.Commits = append(comparison.Commits, *commitEntry)
 		}
@@ -61,7 +63,7 @@ func fetchDiff(client *gitlab.Client, projectPath, baseRef, headRef, compareURL 
 }
 
 // buildCommitEntry creates a commit entry from a GitLab commit with MR enrichment
-func buildCommitEntry(commit *gitlab.Commit, client *gitlab.Client, projectPath, repoURL string, cache *mrCache) *types.Commit {
+func buildCommitEntry(ctx context.Context, commit *gitlab.Commit, client *gitlab.Client, projectPath string, cache *mrCache) *types.Commit {
 	if commit == nil || commit.ID == "" {
 		return nil
 	}
@@ -75,10 +77,7 @@ func buildCommitEntry(commit *gitlab.Commit, client *gitlab.Client, projectPath,
 
 	// Extract commit message (first line only)
 	if commit.Message != "" {
-		lines := strings.Split(commit.Message, "\n")
-		if len(lines) > 0 {
-			entry.Message = strings.TrimSpace(lines[0])
-		}
+		entry.Message = strings.TrimSpace(strings.SplitN(commit.Message, "\n", 2)[0])
 	}
 
 	// Extract author name
@@ -87,7 +86,7 @@ func buildCommitEntry(commit *gitlab.Commit, client *gitlab.Client, projectPath,
 	}
 
 	// Find MR for this commit (cached)
-	mrIID, err := cache.getOrFetchMRForCommit(client, projectPath, entry.SHA)
+	mrIID, err := cache.getOrFetchMRForCommit(ctx, client, projectPath, entry.SHA)
 	if err != nil {
 		slog.Warn("Failed to find MR for commit", "commit", entry.ShortSHA, "error", err)
 		return entry
@@ -98,21 +97,20 @@ func buildCommitEntry(commit *gitlab.Commit, client *gitlab.Client, projectPath,
 		return entry
 	}
 
-	slog.Debug("Found MR for commit", "commit", entry.ShortSHA, "mr_iid", mrIID)
+	slog.Debug("Found MR for commit", "commit", entry.ShortSHA, "mr", mrIID)
 	entry.PRNumber = mrIID
 
 	// Get MR object (cached)
-	mr, err := cache.getOrFetchMR(client, projectPath, mrIID)
+	mr, err := cache.getOrFetchMR(ctx, client, projectPath, mrIID)
 	if err != nil {
-		slog.Warn("Failed to get MR object", "mr_iid", mrIID, "error", err)
+		slog.Warn("Failed to get MR object", "mr", mrIID, "error", err)
 		return entry
 	}
 
 	// Extract QE testing label
-	qeLabel := extractQELabel(mr)
-	entry.QETestingLabel = qeLabel
+	entry.QETestingLabel = extractQELabel(mr)
 
-	slog.Debug("Enriched commit", "commit", entry.ShortSHA, "mr", mrIID, "qe_label", qeLabel)
+	slog.Debug("Enriched commit", "commit", entry.ShortSHA, "mr", mrIID, "qe_label", entry.QETestingLabel)
 
 	return entry
 }
@@ -126,20 +124,15 @@ func extractQELabel(mr *gitlab.MergeRequest) string {
 }
 
 // mrCache caches GitLab API responses to avoid duplicate calls
-// Internal to enrichment - not exposed outside this file
 type mrCache struct {
 	commitToMR    map[string]int64                // commit SHA -> MR IID
 	mergeRequests map[string]*gitlab.MergeRequest // "project/mriid" -> MR object
-	mrNotes       map[string][]*gitlab.Note       // "project/mriid" -> MR notes
-	mrApprovers   map[string][]string             // "project/mriid" -> list of approver usernames
 }
 
 func newMRCache() *mrCache {
 	return &mrCache{
 		commitToMR:    make(map[string]int64),
 		mergeRequests: make(map[string]*gitlab.MergeRequest),
-		mrNotes:       make(map[string][]*gitlab.Note),
-		mrApprovers:   make(map[string][]string),
 	}
 }
 
@@ -147,30 +140,15 @@ func cacheKey(projectPath string, mrIID int64) string {
 	return fmt.Sprintf("%s/%d", projectPath, mrIID)
 }
 
-// getCommitMRIID gets cached MR IID for a commit (doesn't fetch if not in cache)
-func (c *mrCache) getCommitMRIID(commitSHA string) int64 {
-	return c.commitToMR[commitSHA]
-}
-
-// getMR gets cached MR object (doesn't fetch if not in cache)
-func (c *mrCache) getMR(mrIID int64) *gitlab.MergeRequest {
-	for _, mr := range c.mergeRequests {
-		if mr.IID == mrIID {
-			return mr
-		}
-	}
-	return nil
-}
-
-func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, commitSHA string) (int64, error) {
+func (c *mrCache) getOrFetchMRForCommit(ctx context.Context, client *gitlab.Client, projectPath, commitSHA string) (int64, error) {
 	// Check cache first
 	if mrIID, exists := c.commitToMR[commitSHA]; exists {
-		slog.Debug("Using cached commit→MR mapping", "commit", commitSHA[:8], "mr_iid", mrIID)
+		slog.Debug("Using cached commit→MR mapping", "commit", commitSHA[:8], "mr", mrIID)
 		return mrIID, nil
 	}
 
 	// Cache miss - fetch from API
-	mrs, _, err := client.Commits.ListMergeRequestsByCommit(projectPath, commitSHA)
+	mrs, _, err := client.Commits.ListMergeRequestsByCommit(projectPath, commitSHA, gitlab.WithContext(ctx))
 	if err != nil {
 		return 0, fmt.Errorf("failed to get MRs for commit %s: %w", commitSHA[:8], err)
 	}
@@ -201,7 +179,7 @@ func (c *mrCache) getOrFetchMRForCommit(client *gitlab.Client, projectPath, comm
 	return selectedMR.IID, nil
 }
 
-func (c *mrCache) getOrFetchMR(client *gitlab.Client, projectPath string, mrIID int64) (*gitlab.MergeRequest, error) {
+func (c *mrCache) getOrFetchMR(ctx context.Context, client *gitlab.Client, projectPath string, mrIID int64) (*gitlab.MergeRequest, error) {
 	if mrIID == 0 {
 		return nil, nil
 	}
@@ -210,17 +188,17 @@ func (c *mrCache) getOrFetchMR(client *gitlab.Client, projectPath string, mrIID 
 
 	// Check cache first
 	if mr, exists := c.mergeRequests[key]; exists {
-		slog.Debug("Using cached MR object", "mr_iid", mrIID)
+		slog.Debug("Using cached MR object", "mr", mrIID)
 		return mr, nil
 	}
 
 	// Cache miss - fetch from API
-	mr, _, err := client.MergeRequests.GetMergeRequest(projectPath, mrIID, &gitlab.GetMergeRequestsOptions{})
+	mr, _, err := client.MergeRequests.GetMergeRequest(projectPath, mrIID, &gitlab.GetMergeRequestsOptions{}, gitlab.WithContext(ctx))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get MR !%d: %w", mrIID, err)
 	}
 
-	slog.Debug("GitLab API response", "mr_iid", mrIID)
+	slog.Debug("GitLab API response", "mr", mrIID)
 
 	// Cache the result
 	c.mergeRequests[key] = mr
@@ -274,14 +252,28 @@ func convertDiff(diff *gitlab.Diff) types.FileChange {
 	return fileChange
 }
 
+// calculateStats calculates comparison statistics from converted files
+func calculateStats(files []types.FileChange) types.ComparisonStats {
+	stats := types.ComparisonStats{
+		TotalFiles: len(files),
+	}
+
+	for _, file := range files {
+		stats.TotalAdditions += file.Additions
+		stats.TotalDeletions += file.Deletions
+	}
+
+	stats.TotalChanges = stats.TotalAdditions + stats.TotalDeletions
+	return stats
+}
+
 // parsePatchStats counts additions and deletions from a unified diff patch
 func parsePatchStats(patch string) (additions, deletions int) {
 	if patch == "" {
 		return 0, 0
 	}
 
-	lines := splitLines(patch)
-	for _, line := range lines {
+	for _, line := range strings.Split(patch, "\n") {
 		if len(line) == 0 {
 			continue
 		}
@@ -298,42 +290,4 @@ func parsePatchStats(patch string) (additions, deletions int) {
 	}
 
 	return additions, deletions
-}
-
-// splitLines splits a string by newlines
-func splitLines(s string) []string {
-	if s == "" {
-		return nil
-	}
-	lines := make([]string, 0, 100)
-	start := 0
-	for i := 0; i < len(s); i++ {
-		if s[i] == '\n' {
-			lines = append(lines, s[start:i])
-			start = i + 1
-		}
-	}
-	if start < len(s) {
-		lines = append(lines, s[start:])
-	}
-	return lines
-}
-
-// calculateStatsFromDiffs calculates comparison statistics from GitLab diffs
-func calculateStatsFromDiffs(diffs []*gitlab.Diff) types.ComparisonStats {
-	stats := types.ComparisonStats{
-		TotalFiles: len(diffs),
-	}
-
-	for _, diff := range diffs {
-		if diff == nil {
-			continue
-		}
-		additions, deletions := parsePatchStats(diff.Diff)
-		stats.TotalAdditions += additions
-		stats.TotalDeletions += deletions
-	}
-
-	stats.TotalChanges = stats.TotalAdditions + stats.TotalDeletions
-	return stats
 }
