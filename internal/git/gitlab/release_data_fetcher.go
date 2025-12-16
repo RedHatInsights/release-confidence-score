@@ -61,7 +61,7 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	encodedPath := urlEncodeProjectPath(projectPath)
 
 	// Fetch comparison and enrich commits with MR metadata and QE labels
-	comparison, err := fetchDiff(f.client, encodedPath, baseCommit, headCommit, compareURL)
+	comparison, err := fetchDiff(context.Background(), f.client, host, projectPath, baseCommit, headCommit, compareURL)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch and enrich comparison: %w", err)
 	}
@@ -78,7 +78,7 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	baseRepo := types.Repository{
 		Owner: owner,
 		Name:  name,
-		URL:   extractRepoURL(compareURL),
+		URL:   comparison.RepoURL,
 	}
 	docFetcher := shared.NewDocumentationFetcher(docSource, baseRepo, f.config)
 	documentation, err := docFetcher.FetchAllDocs(context.Background())
@@ -106,20 +106,6 @@ func parseCompareURL(compareURL string) (host, projectPath, baseRef, headRef str
 	}
 
 	return matches[1], matches[2], matches[3], matches[4], nil
-}
-
-// extractRepoURL extracts the repository URL from a compare URL
-// e.g., "https://gitlab.com/owner/repo/-/compare/..." -> "https://gitlab.com/owner/repo"
-func extractRepoURL(compareURL string) string {
-	// GitLab uses "/-/compare/" format
-	if idx := strings.Index(compareURL, "/-/compare/"); idx != -1 {
-		return compareURL[:idx]
-	}
-	// Fallback to "/compare/" for other formats
-	if idx := strings.Index(compareURL, "/compare/"); idx != -1 {
-		return compareURL[:idx]
-	}
-	return compareURL
 }
 
 // splitProjectPath splits GitLab project path into owner and name
