@@ -60,14 +60,17 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	// URL-encode project path for API calls
 	encodedPath := urlEncodeProjectPath(projectPath)
 
+	// Create shared cache to avoid duplicate API calls across operations
+	cache := newMRCache()
+
 	// Fetch comparison and enrich commits with MR metadata and QE labels
-	comparison, err := fetchDiff(context.Background(), f.client, host, projectPath, baseCommit, headCommit, compareURL)
+	comparison, err := fetchDiff(context.Background(), f.client, host, projectPath, baseCommit, headCommit, compareURL, cache)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch and enrich comparison: %w", err)
 	}
 
-	// Extract user guidance from MRs in the comparison
-	userGuidance, err := fetchUserGuidance(context.Background(), f.client, encodedPath, comparison)
+	// Extract user guidance from MRs in the comparison (reuses cached MR objects)
+	userGuidance, err := fetchUserGuidance(context.Background(), f.client, encodedPath, comparison, cache)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch user guidance: %w", err)
 	}
@@ -122,4 +125,35 @@ func splitProjectPath(projectPath string) (owner, name string) {
 
 func urlEncodeProjectPath(projectPath string) string {
 	return url.PathEscape(projectPath)
+}
+
+// mrCache caches MR objects to avoid duplicate API calls within a single CLI execution.
+// Multiple commits often belong to the same MR, so caching avoids re-fetching.
+type mrCache struct {
+	mergeRequests map[int64]*gitlabapi.MergeRequest
+}
+
+func newMRCache() *mrCache {
+	return &mrCache{mergeRequests: make(map[int64]*gitlabapi.MergeRequest)}
+}
+
+func (c *mrCache) getOrFetchMR(ctx context.Context, client *gitlabapi.Client, projectPath string, mrIID int64) (*gitlabapi.MergeRequest, error) {
+	if mrIID == 0 {
+		return nil, nil
+	}
+
+	if mr, exists := c.mergeRequests[mrIID]; exists {
+		slog.Debug("Using cached MR object", "mr", mrIID)
+		return mr, nil
+	}
+
+	mr, _, err := client.MergeRequests.GetMergeRequest(projectPath, mrIID, &gitlabapi.GetMergeRequestsOptions{}, gitlabapi.WithContext(ctx))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get MR !%d: %w", mrIID, err)
+	}
+
+	slog.Debug("GitLab API response", "mr", mrIID)
+	c.mergeRequests[mrIID] = mr
+
+	return mr, nil
 }

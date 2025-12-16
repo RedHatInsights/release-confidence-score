@@ -305,38 +305,3 @@ func TestCalculateStats(t *testing.T) {
 		})
 	}
 }
-
-func TestCacheKey(t *testing.T) {
-	tests := []struct {
-		projectPath string
-		mrIID       int64
-		expected    string
-	}{
-		{"group/project", 123, "group/project/123"},
-		{"org/sub/repo", 456, "org/sub/repo/456"},
-		{"simple", 1, "simple/1"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			result := cacheKey(tt.projectPath, tt.mrIID)
-			if result != tt.expected {
-				t.Errorf("cacheKey() = %q, want %q", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestNewMRCache(t *testing.T) {
-	cache := newMRCache()
-
-	if cache == nil {
-		t.Fatal("newMRCache() returned nil")
-	}
-	if cache.commitToMR == nil {
-		t.Error("commitToMR map is nil")
-	}
-	if cache.mergeRequests == nil {
-		t.Error("mergeRequests map is nil")
-	}
-}

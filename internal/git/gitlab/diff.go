@@ -15,7 +15,8 @@ import (
 
 // fetchDiff fetches comparison data from GitLab and enriches commits with MR metadata and QE labels
 // Returns a complete Comparison with enriched commits, files, and stats
-func fetchDiff(ctx context.Context, client *gitlab.Client, host, projectPath, base, head, diffURL string) (*types.Comparison, error) {
+// The cache parameter allows sharing cached MR objects across multiple operations
+func fetchDiff(ctx context.Context, client *gitlab.Client, host, projectPath, base, head, diffURL string, cache *mrCache) (*types.Comparison, error) {
 	slog.Debug("Starting comparison fetch and enrichment", "project", projectPath, "base", base, "head", head)
 
 	// URL-encode project path for API calls
@@ -33,9 +34,6 @@ func fetchDiff(ctx context.Context, client *gitlab.Client, host, projectPath, ba
 	}
 
 	slog.Debug("GitLab comparison fetched", "commits", len(compare.Commits), "diffs", len(compare.Diffs))
-
-	// Create internal cache to avoid duplicate API calls
-	cache := newMRCache()
 
 	// Convert diffs to files (calculates per-file stats once)
 	files := convertDiffs(compare.Diffs)
@@ -85,8 +83,8 @@ func buildCommitEntry(ctx context.Context, commit *gitlab.Commit, client *gitlab
 		entry.Author = commit.AuthorName
 	}
 
-	// Find MR for this commit (cached)
-	mrIID, err := cache.getOrFetchMRForCommit(ctx, client, projectPath, entry.SHA)
+	// Find MR for this commit
+	mrIID, err := getMRForCommit(ctx, client, projectPath, entry.SHA)
 	if err != nil {
 		slog.Warn("Failed to find MR for commit", "commit", entry.ShortSHA, "error", err)
 		return entry
@@ -115,39 +113,7 @@ func buildCommitEntry(ctx context.Context, commit *gitlab.Commit, client *gitlab
 	return entry
 }
 
-// extractQELabel extracts the QE testing label from a GitLab MR
-func extractQELabel(mr *gitlab.MergeRequest) string {
-	if mr == nil {
-		return ""
-	}
-	return shared.ExtractQELabel(mr.Labels)
-}
-
-// mrCache caches GitLab API responses to avoid duplicate calls
-type mrCache struct {
-	commitToMR    map[string]int64                // commit SHA -> MR IID
-	mergeRequests map[string]*gitlab.MergeRequest // "project/mriid" -> MR object
-}
-
-func newMRCache() *mrCache {
-	return &mrCache{
-		commitToMR:    make(map[string]int64),
-		mergeRequests: make(map[string]*gitlab.MergeRequest),
-	}
-}
-
-func cacheKey(projectPath string, mrIID int64) string {
-	return fmt.Sprintf("%s/%d", projectPath, mrIID)
-}
-
-func (c *mrCache) getOrFetchMRForCommit(ctx context.Context, client *gitlab.Client, projectPath, commitSHA string) (int64, error) {
-	// Check cache first
-	if mrIID, exists := c.commitToMR[commitSHA]; exists {
-		slog.Debug("Using cached commit→MR mapping", "commit", commitSHA[:8], "mr", mrIID)
-		return mrIID, nil
-	}
-
-	// Cache miss - fetch from API
+func getMRForCommit(ctx context.Context, client *gitlab.Client, projectPath, commitSHA string) (int64, error) {
 	mrs, _, err := client.Commits.ListMergeRequestsByCommit(projectPath, commitSHA, gitlab.WithContext(ctx))
 	if err != nil {
 		return 0, fmt.Errorf("failed to get MRs for commit %s: %w", commitSHA[:8], err)
@@ -155,55 +121,26 @@ func (c *mrCache) getOrFetchMRForCommit(ctx context.Context, client *gitlab.Clie
 
 	slog.Debug("GitLab API response", "commit", commitSHA[:8], "found_mrs", len(mrs))
 
-	// If no MRs found, cache 0 to avoid re-fetching
 	if len(mrs) == 0 {
-		c.commitToMR[commitSHA] = 0
 		return 0, nil
 	}
 
-	// Use the first merged MR (or first MR if none are merged)
-	var selectedMR *gitlab.BasicMergeRequest
+	// Use first merged MR, or first MR if none are merged
 	for _, mr := range mrs {
 		if mr.State == "merged" {
-			selectedMR = mr
-			break
+			return mr.IID, nil
 		}
 	}
-	if selectedMR == nil {
-		selectedMR = mrs[0]
-	}
 
-	// Cache the result
-	c.commitToMR[commitSHA] = selectedMR.IID
-
-	return selectedMR.IID, nil
+	return mrs[0].IID, nil
 }
 
-func (c *mrCache) getOrFetchMR(ctx context.Context, client *gitlab.Client, projectPath string, mrIID int64) (*gitlab.MergeRequest, error) {
-	if mrIID == 0 {
-		return nil, nil
+// extractQELabel extracts the QE testing label from a GitLab MR
+func extractQELabel(mr *gitlab.MergeRequest) string {
+	if mr == nil {
+		return ""
 	}
-
-	key := cacheKey(projectPath, mrIID)
-
-	// Check cache first
-	if mr, exists := c.mergeRequests[key]; exists {
-		slog.Debug("Using cached MR object", "mr", mrIID)
-		return mr, nil
-	}
-
-	// Cache miss - fetch from API
-	mr, _, err := client.MergeRequests.GetMergeRequest(projectPath, mrIID, &gitlab.GetMergeRequestsOptions{}, gitlab.WithContext(ctx))
-	if err != nil {
-		return nil, fmt.Errorf("failed to get MR !%d: %w", mrIID, err)
-	}
-
-	slog.Debug("GitLab API response", "mr", mrIID)
-
-	// Cache the result
-	c.mergeRequests[key] = mr
-
-	return mr, nil
+	return shared.ExtractQELabel(mr.Labels)
 }
 
 // convertDiffs converts GitLab Diffs to platform-agnostic FileChanges

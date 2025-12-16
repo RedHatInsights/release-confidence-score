@@ -12,7 +12,8 @@ import (
 )
 
 // fetchUserGuidance extracts user guidance from all PRs in the comparison
-func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo string, comparison *types.Comparison) ([]types.UserGuidance, error) {
+// The cache parameter allows reusing PR objects already fetched during diff enrichment
+func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo string, comparison *types.Comparison, cache *prCache) ([]types.UserGuidance, error) {
 	if comparison == nil || len(comparison.Commits) == 0 {
 		return []types.UserGuidance{}, nil
 	}
@@ -32,8 +33,8 @@ func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo s
 
 		processedPRs[commit.PRNumber] = true
 
-		// Get PR object
-		pr, _, err := client.PullRequests.Get(ctx, owner, repo, int(commit.PRNumber))
+		// Get PR object (uses cache populated during diff enrichment)
+		pr, err := cache.getOrFetchPR(ctx, client, owner, repo, int(commit.PRNumber))
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch PR #%d for guidance extraction: %w", commit.PRNumber, err)
 		}

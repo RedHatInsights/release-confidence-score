@@ -264,7 +264,8 @@ func TestGetMRApprovers(t *testing.T) {
 }
 
 func TestFetchUserGuidance_NilComparison(t *testing.T) {
-	result, err := fetchUserGuidance(nil, nil, "", nil)
+	cache := newMRCache()
+	result, err := fetchUserGuidance(nil, nil, "", nil, cache)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -284,10 +285,11 @@ func TestExtractUserGuidance_NilMR(t *testing.T) {
 }
 
 func TestFetchUserGuidance_EmptyComparison(t *testing.T) {
+	cache := newMRCache()
 	comparison := &types.Comparison{
 		Commits: []types.Commit{},
 	}
-	result, err := fetchUserGuidance(nil, nil, "", comparison)
+	result, err := fetchUserGuidance(nil, nil, "", comparison, cache)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -297,13 +299,14 @@ func TestFetchUserGuidance_EmptyComparison(t *testing.T) {
 }
 
 func TestFetchUserGuidance_CommitsWithoutMRNumber(t *testing.T) {
+	cache := newMRCache()
 	comparison := &types.Comparison{
 		Commits: []types.Commit{
 			{SHA: "abc123", PRNumber: 0},
 			{SHA: "def456", PRNumber: 0},
 		},
 	}
-	result, err := fetchUserGuidance(nil, nil, "", comparison)
+	result, err := fetchUserGuidance(nil, nil, "", comparison, cache)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
