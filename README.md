@@ -214,7 +214,7 @@ Developers can provide release-specific guidance in pull request/merge request c
 /rcs This release includes database migrations that require manual steps after deployment.
 ```
 
-The `/rcs` prefix can appear anywhere in the comment, and everything after it is captured as guidance. Multiple lines are supported.
+The `/rcs` prefix must appear at the start of the comment (with optional leading whitespace), and everything after it is captured as guidance. Multiple lines are supported.
 
 **Authorization**: Only guidance from the PR/MR author or approvers is marked as authorized and weighted more heavily in the analysis.
 
@@ -225,3 +225,7 @@ RCS recognizes QE testing labels on pull requests and merge requests:
 - `rcs/needs-qe-testing`: Changes require QE verification
 
 These labels are included in the analysis to help assess test coverage and release risk.
+
+### API Rate Limit Optimization
+
+RCS uses in-memory caching to minimize API calls to GitHub and GitLab. When analyzing a release, the same PR/MR objects are often needed for multiple operations (commit enrichment, QE label extraction, user guidance collection). Caching ensures each PR/MR is fetched only once per analysis run, reducing the risk of hitting API rate limits when analyzing releases with many commits.
