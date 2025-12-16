@@ -53,14 +53,17 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 
 	slog.Debug("Parsed compare URL", "owner", owner, "repo", repo, "base", baseCommit, "head", headCommit)
 
+	// Create shared cache to avoid duplicate API calls across operations
+	cache := newPRCache()
+
 	// Fetch comparison and enrich commits with PR metadata and QE labels
-	comparison, err := fetchDiff(context.Background(), f.client, owner, repo, baseCommit, headCommit, compareURL)
+	comparison, err := fetchDiff(context.Background(), f.client, owner, repo, baseCommit, headCommit, compareURL, cache)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch and enrich comparison: %w", err)
 	}
 
-	// Extract user guidance from PRs in the comparison
-	userGuidance, err := fetchUserGuidance(context.Background(), f.client, owner, repo, comparison)
+	// Extract user guidance from PRs in the comparison (reuses cached PR objects)
+	userGuidance, err := fetchUserGuidance(context.Background(), f.client, owner, repo, comparison, cache)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("failed to fetch user guidance: %w", err)
 	}
@@ -107,4 +110,34 @@ func extractRepoURL(compareURL string) string {
 		return compareURL[:idx]
 	}
 	return compareURL
+}
+
+// prCache caches PR objects to avoid duplicate API calls within a single CLI execution.
+// Multiple commits often belong to the same PR, so caching avoids re-fetching.
+type prCache struct {
+	prs map[int]*githubapi.PullRequest
+}
+
+func newPRCache() *prCache {
+	return &prCache{prs: make(map[int]*githubapi.PullRequest)}
+}
+
+func (c *prCache) getOrFetchPR(ctx context.Context, client *githubapi.Client, owner, repo string, prNumber int) (*githubapi.PullRequest, error) {
+	if prNumber == 0 {
+		return nil, nil
+	}
+
+	if pr, exists := c.prs[prNumber]; exists {
+		slog.Debug("Using cached PR object", "pr", prNumber)
+		return pr, nil
+	}
+
+	pr, resp, err := client.PullRequests.Get(ctx, owner, repo, prNumber)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get PR #%d: %w", prNumber, err)
+	}
+
+	slog.Debug("GitHub API response", "pr", prNumber, "rate_limit_remaining", resp.Rate.Remaining)
+	c.prs[prNumber] = pr
+	return pr, nil
 }

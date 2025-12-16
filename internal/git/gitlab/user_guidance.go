@@ -11,7 +11,8 @@ import (
 )
 
 // fetchUserGuidance extracts user guidance from all MRs in the comparison
-func fetchUserGuidance(ctx context.Context, client *gitlab.Client, projectPath string, comparison *types.Comparison) ([]types.UserGuidance, error) {
+// The cache parameter allows reusing MR objects already fetched during diff enrichment
+func fetchUserGuidance(ctx context.Context, client *gitlab.Client, projectPath string, comparison *types.Comparison, cache *mrCache) ([]types.UserGuidance, error) {
 	if comparison == nil || len(comparison.Commits) == 0 {
 		return []types.UserGuidance{}, nil
 	}
@@ -31,8 +32,8 @@ func fetchUserGuidance(ctx context.Context, client *gitlab.Client, projectPath s
 
 		processedMRs[commit.PRNumber] = true
 
-		// Get MR object
-		mr, _, err := client.MergeRequests.GetMergeRequest(projectPath, commit.PRNumber, nil)
+		// Get MR object (uses cache populated during diff enrichment)
+		mr, err := cache.getOrFetchMR(ctx, client, projectPath, commit.PRNumber)
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch MR !%d for guidance extraction: %w", commit.PRNumber, err)
 		}
@@ -42,7 +43,7 @@ func fetchUserGuidance(ctx context.Context, client *gitlab.Client, projectPath s
 		}
 
 		// Extract guidance from this MR
-		slog.Debug("Extracting user guidance from MR", "mr_iid", commit.PRNumber)
+		slog.Debug("Extracting user guidance from MR", "mr", commit.PRNumber)
 		guidance, err := extractUserGuidance(ctx, client, projectPath, comparison.RepoURL, mr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to extract user guidance from MR !%d: %w", commit.PRNumber, err)

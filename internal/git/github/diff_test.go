@@ -265,39 +265,3 @@ func TestCalculateStats(t *testing.T) {
 		})
 	}
 }
-
-func TestCacheKey(t *testing.T) {
-	tests := []struct {
-		owner      string
-		repo       string
-		identifier interface{}
-		expected   string
-	}{
-		{"owner", "repo", "abc123", "owner/repo/abc123"},
-		{"org", "project", 123, "org/project/123"},
-		{"user", "lib", int64(456), "user/lib/456"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			result := cacheKey(tt.owner, tt.repo, tt.identifier)
-			if result != tt.expected {
-				t.Errorf("cacheKey() = %q, want %q", result, tt.expected)
-			}
-		})
-	}
-}
-
-func TestNewPRCache(t *testing.T) {
-	cache := newPRCache()
-
-	if cache == nil {
-		t.Fatal("newPRCache() returned nil")
-	}
-	if cache.commitToPR == nil {
-		t.Error("commitToPR map is nil")
-	}
-	if cache.prs == nil {
-		t.Error("prs map is nil")
-	}
-}

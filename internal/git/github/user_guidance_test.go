@@ -307,7 +307,8 @@ func TestFetchAllPaginated(t *testing.T) {
 
 func TestFetchUserGuidance_NilComparison(t *testing.T) {
 	ctx := context.Background()
-	result, err := fetchUserGuidance(ctx, nil, "owner", "repo", nil)
+	cache := newPRCache()
+	result, err := fetchUserGuidance(ctx, nil, "owner", "repo", nil, cache)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -318,10 +319,11 @@ func TestFetchUserGuidance_NilComparison(t *testing.T) {
 
 func TestFetchUserGuidance_EmptyCommits(t *testing.T) {
 	ctx := context.Background()
+	cache := newPRCache()
 	comparison := &types.Comparison{
 		Commits: []types.Commit{},
 	}
-	result, err := fetchUserGuidance(ctx, nil, "owner", "repo", comparison)
+	result, err := fetchUserGuidance(ctx, nil, "owner", "repo", comparison, cache)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
@@ -332,13 +334,14 @@ func TestFetchUserGuidance_EmptyCommits(t *testing.T) {
 
 func TestFetchUserGuidance_CommitsWithoutPRNumber(t *testing.T) {
 	ctx := context.Background()
+	cache := newPRCache()
 	comparison := &types.Comparison{
 		Commits: []types.Commit{
 			{SHA: "abc123", PRNumber: 0},
 			{SHA: "def456", PRNumber: 0},
 		},
 	}
-	result, err := fetchUserGuidance(ctx, nil, "owner", "repo", comparison)
+	result, err := fetchUserGuidance(ctx, nil, "owner", "repo", comparison, cache)
 	if err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}

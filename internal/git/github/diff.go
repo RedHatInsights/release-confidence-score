@@ -14,7 +14,8 @@ import (
 
 // fetchDiff fetches comparison data from GitHub and enriches commits with PR metadata and QE labels
 // Returns a complete Comparison with enriched commits, files, and stats
-func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, head, diffURL string) (*types.Comparison, error) {
+// The cache parameter allows sharing cached PR objects across multiple operations
+func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, head, diffURL string, cache *prCache) (*types.Comparison, error) {
 	slog.Debug("Starting comparison fetch and enrichment", "owner", owner, "repo", repo, "base", base, "head", head)
 
 	// Fetch comparison data with all commits (handles pagination)
@@ -24,9 +25,6 @@ func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, he
 	}
 
 	slog.Debug("Fetched GitHub comparison", "commits", len(allCommits), "files", len(ghComparison.Files))
-
-	// Create internal cache to avoid duplicate API calls
-	cache := newPRCache()
 
 	// Initialize comparison with files and stats from GitHub
 	comparison := &types.Comparison{
@@ -73,8 +71,8 @@ func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, clie
 		entry.Author = name
 	}
 
-	// Find PR for this commit (cached)
-	prNumber, err := cache.getOrFetchPRForCommit(ctx, client, owner, repo, entry.SHA)
+	// Find PR for this commit
+	prNumber, err := getPRForCommit(ctx, client, owner, repo, entry.SHA)
 	if err != nil {
 		slog.Warn("Failed to find PR for commit", "commit", entry.ShortSHA, "error", err)
 		return entry
@@ -103,6 +101,24 @@ func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, clie
 	return entry
 }
 
+func getPRForCommit(ctx context.Context, client *github.Client, owner, repo, commitSHA string) (int, error) {
+	prs, resp, err := client.PullRequests.ListPullRequestsWithCommit(ctx, owner, repo, commitSHA, nil)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find PRs for commit %s: %w", commitSHA[:8], err)
+	}
+
+	slog.Debug("GitHub API response", "commit", commitSHA[:8], "found_prs", len(prs), "rate_limit_remaining", resp.Rate.Remaining)
+
+	// Find first merged PR
+	for _, pr := range prs {
+		if !pr.GetMergedAt().IsZero() {
+			return pr.GetNumber(), nil
+		}
+	}
+
+	return 0, nil
+}
+
 // extractQELabel extracts the QE testing label from a PR
 func extractQELabel(pr *github.PullRequest) string {
 	if pr == nil {
@@ -113,82 +129,6 @@ func extractQELabel(pr *github.PullRequest) string {
 		labelNames[i] = label.GetName()
 	}
 	return shared.ExtractQELabel(labelNames)
-}
-
-// prCache caches GitHub API responses to avoid duplicate calls
-type prCache struct {
-	commitToPR map[string]int                 // "owner/repo/SHA" → PR number
-	prs        map[string]*github.PullRequest // "owner/repo/123" → PR object
-}
-
-func newPRCache() *prCache {
-	return &prCache{
-		commitToPR: make(map[string]int),
-		prs:        make(map[string]*github.PullRequest),
-	}
-}
-
-func cacheKey(owner, repo string, identifier interface{}) string {
-	return fmt.Sprintf("%s/%s/%v", owner, repo, identifier)
-}
-
-func (c *prCache) getOrFetchPRForCommit(ctx context.Context, client *github.Client, owner, repo, commitSHA string) (int, error) {
-	key := cacheKey(owner, repo, commitSHA)
-
-	if prNumber, exists := c.commitToPR[key]; exists {
-		slog.Debug("Using cached commit→PR mapping", "commit", commitSHA[:8], "pr", prNumber)
-		return prNumber, nil
-	}
-
-	// Fetch from GitHub API
-	prs, resp, err := client.PullRequests.ListPullRequestsWithCommit(ctx, owner, repo, commitSHA, nil)
-	if err != nil {
-		return 0, fmt.Errorf("failed to find PRs for commit %s: %w", commitSHA[:8], err)
-	}
-
-	slog.Debug("GitHub API response", "commit", commitSHA[:8], "found_prs", len(prs), "rate_limit_remaining", resp.Rate.Remaining)
-
-	// Find merged PRs
-	var mergedPRs []int
-	for _, pr := range prs {
-		if !pr.GetMergedAt().IsZero() {
-			mergedPRs = append(mergedPRs, pr.GetNumber())
-		}
-	}
-
-	if len(mergedPRs) > 1 {
-		slog.Warn("Multiple merged PRs for commit (using first)", "commit", commitSHA[:8], "prs", mergedPRs)
-	}
-
-	if len(mergedPRs) > 0 {
-		c.commitToPR[key] = mergedPRs[0]
-		return mergedPRs[0], nil
-	}
-
-	c.commitToPR[key] = 0
-	return 0, nil
-}
-
-func (c *prCache) getOrFetchPR(ctx context.Context, client *github.Client, owner, repo string, prNumber int) (*github.PullRequest, error) {
-	if prNumber == 0 {
-		return nil, nil
-	}
-
-	key := cacheKey(owner, repo, prNumber)
-
-	if pr, exists := c.prs[key]; exists {
-		slog.Debug("Using cached PR object", "pr", prNumber)
-		return pr, nil
-	}
-
-	pr, resp, err := client.PullRequests.Get(ctx, owner, repo, prNumber)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get PR #%d: %w", prNumber, err)
-	}
-
-	slog.Debug("GitHub API response", "pr", prNumber, "rate_limit_remaining", resp.Rate.Remaining)
-	c.prs[key] = pr
-	return pr, nil
 }
 
 // fetchComparisonWithPagination fetches comparison data with full commit pagination
