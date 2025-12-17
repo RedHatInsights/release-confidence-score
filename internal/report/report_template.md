@@ -207,13 +207,13 @@ The following user guidance was provided in GitLab MR and GitHub PR discussions:
 
 Learn how to improve your confidence scores and get more accurate analysis:
 
-👉 **[Guide: Improving Your Release Confidence Analysis](https://gitlab.cee.redhat.com/glepage/release-confidence-score/-/blob/master/docs/IMPROVING_ANALYSIS.md)**
+👉 **[Guide: Improving Your Release Confidence Analysis](https://github.com/RedHatInsights/release-confidence-score/blob/main/docs/IMPROVING_ANALYSIS.md)**
 
 **Quick tips:**
 - Add `.release-confidence-docs.md` to your repository for context-aware analysis
-- Use `/rcs` comments to guide the AI's attention to specific concerns
-- Keep MRs focused and reasonably sized for better analysis quality
-- Apply QE testing labels and write clear commit messages
+- Use `/rcs` comments to provide context the AI can't infer from code
+- Keep PRs/MRs focused and reasonably sized for better analysis quality
+- Apply `rcs/qe-tested` or `rcs/needs-qe-testing` labels
 
 ---
 
