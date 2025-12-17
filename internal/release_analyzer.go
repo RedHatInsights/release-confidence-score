@@ -30,7 +30,11 @@ type ReleaseAnalyzer struct {
 
 func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 	githubClient := github.NewClient(cfg)
-	gitlabClient := gitlab.NewClient(cfg)
+
+	gitlabClient, err := gitlab.NewClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitLab client: %w", err)
+	}
 
 	llmClient, err := providers.NewClient(cfg)
 	if err != nil {
@@ -121,7 +125,7 @@ func (ra *ReleaseAnalyzer) getReleaseData(urls []string) ([]*types.Comparison, [
 	}
 
 	if duplicateCount > 0 {
-		slog.Info("Deduplicated compare URLs", "total", len(urls), "unique", len(uniqueURLs), "duplicates_removed", duplicateCount)
+		slog.Debug("Deduplicated compare URLs", "total", len(urls), "unique", len(uniqueURLs), "duplicates_removed", duplicateCount)
 	}
 
 	var comparisons []*types.Comparison
