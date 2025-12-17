@@ -68,10 +68,15 @@ func authorizationStatus(isAuthorized bool) string {
 }
 
 func prLink(prNumber int64, repoURL string) string {
-	if prNumber > 0 {
+	if prNumber <= 0 {
+		return "N/A"
+	}
+
+	// GitLab uses /-/merge_requests/, GitHub uses /pull/
+	if strings.Contains(repoURL, "github.com") {
 		return fmt.Sprintf("[#%d](%s/pull/%d)", prNumber, repoURL, prNumber)
 	}
-	return "N/A"
+	return fmt.Sprintf("[!%d](%s/-/merge_requests/%d)", prNumber, repoURL, prNumber)
 }
 
 func formatAuthor(author, commentURL string) string {

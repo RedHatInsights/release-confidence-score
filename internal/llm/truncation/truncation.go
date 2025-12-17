@@ -41,7 +41,7 @@ const (
 // TruncationMetadata contains information about diff truncation applied during LLM analysis
 type TruncationMetadata struct {
 	Truncated          bool     // Whether truncation was applied
-	Level              string   // Truncation level: "moderate", "aggressive", "extreme", "ultimate"
+	Level              string   // Truncation level: "low", "moderate", "high", "extreme"
 	FilesPreserved     int      // Number of files kept in full
 	FilesTruncated     int      // Number of files that were truncated
 	TruncatedFilesList []string // List of truncated file paths

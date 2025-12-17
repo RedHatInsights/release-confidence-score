@@ -121,18 +121,14 @@ func getMRForCommit(ctx context.Context, client *gitlab.Client, projectPath, com
 
 	slog.Debug("GitLab API response", "commit", commitSHA[:8], "found_mrs", len(mrs))
 
-	if len(mrs) == 0 {
-		return 0, nil
-	}
-
-	// Use first merged MR, or first MR if none are merged
+	// Find first merged MR
 	for _, mr := range mrs {
 		if mr.State == "merged" {
 			return mr.IID, nil
 		}
 	}
 
-	return mrs[0].IID, nil
+	return 0, nil
 }
 
 // extractQELabel extracts the QE testing label from a GitLab MR
