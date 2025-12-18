@@ -18,7 +18,8 @@ import (
 // gitlabCompareRegex matches GitLab compare URLs and extracts components
 // Format: https://gitlab.com/owner/repo/-/compare/base...head
 // or: https://gitlab.com/group/subgroup/repo/-/compare/base...head
-var gitlabCompareRegex = regexp.MustCompile(`^https?://([^/]+)/(.+)/-/compare/([^.]+)\.\.\.([^?#]+)`)
+// Refs can be commit SHAs, tags (v1.0.0), or branches (main, feature/foo)
+var gitlabCompareRegex = regexp.MustCompile(`^https?://([^/]+)/(.+)/-/compare/(.+?)\.\.\.([^?#]+)`)
 
 // Fetcher implements the GitProvider interface for GitLab
 type Fetcher struct {

@@ -29,6 +29,13 @@
 - Same error message format across similar functions
 - Same variable naming conventions
 
+### GitHub/GitLab Parity
+The `git/github/` and `git/gitlab/` packages implement the same `GitProvider` interface. When modifying one:
+- Check if the same change applies to the other platform
+- Keep function signatures, error messages, and behavior consistent
+- If a fix applies to one platform, it likely applies to both (e.g., URL regex fixes)
+- When in doubt about whether a change should be mirrored, ask the user before proceeding
+
 ### Before Writing Code
 - Read existing code first to understand patterns
 - Question whether the feature/change is needed
