@@ -14,7 +14,8 @@ import (
 )
 
 // githubCompareRegex matches GitHub compare URLs and extracts components
-var githubCompareRegex = regexp.MustCompile(`^https?://github\.com/([^/]+)/([^/]+)/compare/([a-f0-9]+)\.\.\.([a-f0-9]+)$`)
+// Refs can be commit SHAs, tags (v1.0.0), or branches (main, feature/foo)
+var githubCompareRegex = regexp.MustCompile(`^https?://github\.com/([^/]+)/([^/]+)/compare/(.+?)\.\.\.([^?#]+)$`)
 
 // Fetcher implements the GitProvider interface for GitHub
 type Fetcher struct {
