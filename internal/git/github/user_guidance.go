@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/go-github/v80/github"
+	"golang.org/x/sync/errgroup"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 )
@@ -60,23 +61,54 @@ func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo s
 }
 
 // extractUserGuidance extracts all user guidance from a PR's comments
+// Fetches issue comments and review comments in parallel for better performance
 func extractUserGuidance(ctx context.Context, client *github.Client, owner, repo string, pr *github.PullRequest) ([]types.UserGuidance, error) {
 	if pr == nil {
 		return nil, nil
 	}
 
 	prNumber := pr.GetNumber()
-	var allGuidance []types.UserGuidance
 
-	// Fetch issue comments (PR discussion)
-	issueComments, err := fetchAllPaginated(ctx,
-		func(ctx context.Context, opts *github.ListOptions) ([]*github.IssueComment, *github.Response, error) {
-			return client.Issues.ListComments(ctx, owner, repo, prNumber, &github.IssueListCommentsOptions{ListOptions: *opts})
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get comments for PR #%d: %w", prNumber, err)
+	// Fetch issue comments and review comments in parallel
+	// Use a separate variable for errgroup context to avoid shadowing the outer ctx
+	// (errgroup's context is canceled after Wait() returns, but we still need ctx for processComment)
+	g, gCtx := errgroup.WithContext(ctx)
+
+	var issueComments []*github.IssueComment
+	var reviewComments []*github.PullRequestComment
+
+	g.Go(func() error {
+		var err error
+		issueComments, err = fetchAllPaginated(gCtx,
+			func(ctx context.Context, opts *github.ListOptions) ([]*github.IssueComment, *github.Response, error) {
+				return client.Issues.ListComments(ctx, owner, repo, prNumber, &github.IssueListCommentsOptions{ListOptions: *opts})
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get comments for PR #%d: %w", prNumber, err)
+		}
+		return nil
+	})
+
+	g.Go(func() error {
+		var err error
+		reviewComments, err = fetchAllPaginated(gCtx,
+			func(ctx context.Context, opts *github.ListOptions) ([]*github.PullRequestComment, *github.Response, error) {
+				return client.PullRequests.ListComments(ctx, owner, repo, prNumber, &github.PullRequestListCommentsOptions{ListOptions: *opts})
+			},
+		)
+		if err != nil {
+			return fmt.Errorf("failed to get review comments for PR #%d: %w", prNumber, err)
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
+
+	// Process comments sequentially - use original ctx (not gCtx which is now canceled)
+	var allGuidance []types.UserGuidance
 
 	for _, comment := range issueComments {
 		if !isValidIssueComment(comment) {
@@ -97,16 +129,6 @@ func extractUserGuidance(ctx context.Context, client *github.Client, owner, repo
 		if guidance != nil {
 			allGuidance = append(allGuidance, *guidance)
 		}
-	}
-
-	// Fetch review comments
-	reviewComments, err := fetchAllPaginated(ctx,
-		func(ctx context.Context, opts *github.ListOptions) ([]*github.PullRequestComment, *github.Response, error) {
-			return client.PullRequests.ListComments(ctx, owner, repo, prNumber, &github.PullRequestListCommentsOptions{ListOptions: *opts})
-		},
-	)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get review comments for PR #%d: %w", prNumber, err)
 	}
 
 	for _, comment := range reviewComments {

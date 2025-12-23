@@ -85,7 +85,7 @@ func TestIsCompareURL(t *testing.T) {
 	}
 }
 
-func TestGitlabCompareRegexExtraction(t *testing.T) {
+func TestParseCompareURL(t *testing.T) {
 	tests := []struct {
 		name        string
 		url         string
@@ -93,6 +93,7 @@ func TestGitlabCompareRegexExtraction(t *testing.T) {
 		wantProject string
 		wantBase    string
 		wantHead    string
+		wantErr     bool
 	}{
 		{
 			name:        "simple project",
@@ -126,26 +127,118 @@ func TestGitlabCompareRegexExtraction(t *testing.T) {
 			wantBase:    "v1.0",
 			wantHead:    "v2.0",
 		},
+		{
+			name:    "invalid URL",
+			url:     "https://gitlab.com/owner/repo/-/merge_requests/123",
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			matches := gitlabCompareRegex.FindStringSubmatch(tt.url)
-			if len(matches) != 5 {
-				t.Fatalf("expected 5 matches, got %d: %v", len(matches), matches)
+			host, project, base, head, err := parseCompareURL(tt.url)
+
+			if tt.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
 			}
 
-			if matches[1] != tt.wantHost {
-				t.Errorf("host = %q, want %q", matches[1], tt.wantHost)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
 			}
-			if matches[2] != tt.wantProject {
-				t.Errorf("project = %q, want %q", matches[2], tt.wantProject)
+
+			if host != tt.wantHost {
+				t.Errorf("host = %q, want %q", host, tt.wantHost)
 			}
-			if matches[3] != tt.wantBase {
-				t.Errorf("base = %q, want %q", matches[3], tt.wantBase)
+			if project != tt.wantProject {
+				t.Errorf("project = %q, want %q", project, tt.wantProject)
 			}
-			if matches[4] != tt.wantHead {
-				t.Errorf("head = %q, want %q", matches[4], tt.wantHead)
+			if base != tt.wantBase {
+				t.Errorf("base = %q, want %q", base, tt.wantBase)
+			}
+			if head != tt.wantHead {
+				t.Errorf("head = %q, want %q", head, tt.wantHead)
+			}
+		})
+	}
+}
+
+func TestSplitProjectPath(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		wantOwner string
+		wantName  string
+	}{
+		{
+			name:      "simple path",
+			path:      "group/repo",
+			wantOwner: "group",
+			wantName:  "repo",
+		},
+		{
+			name:      "nested group",
+			path:      "group/subgroup/repo",
+			wantOwner: "group/subgroup",
+			wantName:  "repo",
+		},
+		{
+			name:      "deeply nested",
+			path:      "a/b/c/d/repo",
+			wantOwner: "a/b/c/d",
+			wantName:  "repo",
+		},
+		{
+			name:      "no slash",
+			path:      "repo",
+			wantOwner: "",
+			wantName:  "repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			owner, name := splitProjectPath(tt.path)
+			if owner != tt.wantOwner {
+				t.Errorf("owner = %q, want %q", owner, tt.wantOwner)
+			}
+			if name != tt.wantName {
+				t.Errorf("name = %q, want %q", name, tt.wantName)
+			}
+		})
+	}
+}
+
+func TestUrlEncodeProjectPath(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want string
+	}{
+		{
+			name: "simple path",
+			path: "owner/repo",
+			want: "owner%2Frepo",
+		},
+		{
+			name: "nested group",
+			path: "group/subgroup/repo",
+			want: "group%2Fsubgroup%2Frepo",
+		},
+		{
+			name: "no encoding needed",
+			path: "repo",
+			want: "repo",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := urlEncodeProjectPath(tt.path)
+			if got != tt.want {
+				t.Errorf("urlEncodeProjectPath(%q) = %q, want %q", tt.path, got, tt.want)
 			}
 		})
 	}

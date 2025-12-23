@@ -1,8 +1,10 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"release-confidence-score/internal/app_interface"
@@ -16,6 +18,8 @@ import (
 	"release-confidence-score/internal/llm/providers"
 	"release-confidence-score/internal/llm/truncation"
 	"release-confidence-score/internal/report"
+
+	"golang.org/x/sync/errgroup"
 
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
@@ -104,6 +108,7 @@ func (ra *ReleaseAnalyzer) AnalyzeStandalone(compareURLs []string) (float64, str
 }
 
 // getReleaseData fetches raw release data from multiple compare URLs (GitHub or GitLab)
+// URLs are processed in parallel for better performance
 // Returns: comparisons, user guidance, documentation, error
 func (ra *ReleaseAnalyzer) getReleaseData(urls []string) ([]*types.Comparison, []types.UserGuidance, []*types.Documentation, error) {
 	if len(urls) == 0 {
@@ -128,62 +133,72 @@ func (ra *ReleaseAnalyzer) getReleaseData(urls []string) ([]*types.Comparison, [
 		slog.Debug("Deduplicated compare URLs", "total", len(urls), "unique", len(uniqueURLs), "duplicates_removed", duplicateCount)
 	}
 
+	// Fetch all URLs in parallel
+	g, gCtx := errgroup.WithContext(context.Background())
+
+	var mu sync.Mutex // Protects concurrent appends to result slices
 	var comparisons []*types.Comparison
 	var allUserGuidance []types.UserGuidance
 	var documentation []*types.Documentation
 
 	for _, url := range uniqueURLs {
-		// Detect which provider to use based on URL
-		var provider types.GitProvider
+		g.Go(func() error {
+			// Detect which provider to use based on URL
+			var provider types.GitProvider
+			switch {
+			case ra.githubProvider.IsCompareURL(url):
+				provider = ra.githubProvider
+			case ra.gitlabProvider.IsCompareURL(url):
+				provider = ra.gitlabProvider
+			default:
+				slog.Warn("Skipping unsupported URL", "url", url)
+				return nil
+			}
 
-		switch {
-		case ra.githubProvider.IsCompareURL(url):
-			provider = ra.githubProvider
-		case ra.gitlabProvider.IsCompareURL(url):
-			provider = ra.gitlabProvider
-		default:
-			slog.Warn("Skipping unsupported URL", "url", url)
-			continue
-		}
+			platformName := provider.Name()
+			slog.Debug("Fetching data", "platform", platformName, "url", url)
 
-		platformName := provider.Name()
-		slog.Debug("Fetching data", "platform", platformName, "url", url)
+			// Fetch all release data (comparison with enriched commits, user guidance, documentation)
+			comparison, userGuidance, docs, err := provider.FetchReleaseData(gCtx, url)
+			if err != nil {
+				slog.Error("Error fetching data", "platform", platformName, "error", err, "url", url)
+				return nil
+			}
 
-		// Fetch all release data (comparison with enriched commits, user guidance, documentation)
-		comparison, userGuidance, docs, err := provider.FetchReleaseData(url)
-		if err != nil {
-			slog.Error("Error fetching data", "platform", platformName, "error", err, "url", url)
-			continue
-		}
+			mu.Lock()
+			defer mu.Unlock()
 
-		// Collect comparison if available
-		if comparison != nil {
-			slog.Debug("Collected comparison",
-				"platform", platformName,
-				"commit_count", len(comparison.Commits),
-				"file_count", len(comparison.Files))
-			comparisons = append(comparisons, comparison)
-		} else {
-			slog.Warn("No comparison data received", "platform", platformName)
-		}
+			// Collect comparison if available
+			if comparison != nil {
+				slog.Debug("Collected comparison",
+					"platform", platformName,
+					"commit_count", len(comparison.Commits),
+					"file_count", len(comparison.Files))
+				comparisons = append(comparisons, comparison)
+			} else {
+				slog.Warn("No comparison data received", "platform", platformName)
+			}
 
-		// Collect user guidance
-		if len(userGuidance) > 0 {
-			slog.Debug("Collected user guidance",
-				"platform", platformName,
-				"count", len(userGuidance))
-			allUserGuidance = append(allUserGuidance, userGuidance...)
-		}
+			// Collect user guidance
+			if len(userGuidance) > 0 {
+				slog.Debug("Collected user guidance", "platform", platformName, "count", len(userGuidance))
+				allUserGuidance = append(allUserGuidance, userGuidance...)
+			}
 
-		// Collect documentation if available
-		if docs != nil && docs.MainDocFile != "" {
-			slog.Debug("Collected documentation",
-				"platform", platformName,
-				"repo_url", docs.Repository.URL,
-				"entry_point", docs.MainDocFile)
-			documentation = append(documentation, docs)
-		}
+			// Collect documentation if available
+			if docs != nil && docs.MainDocFile != "" {
+				slog.Debug("Collected documentation",
+					"platform", platformName,
+					"repo_url", docs.Repository.URL,
+					"entry_point", docs.MainDocFile)
+				documentation = append(documentation, docs)
+			}
+
+			return nil
+		})
 	}
+
+	g.Wait()
 
 	return comparisons, allUserGuidance, documentation, nil
 }

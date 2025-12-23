@@ -7,10 +7,13 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
+	"sync"
 
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
+
+	"golang.org/x/sync/errgroup"
 
 	gitlabapi "gitlab.com/gitlab-org/api/client-go"
 )
@@ -47,7 +50,8 @@ func (f *Fetcher) IsCompareURL(url string) bool {
 
 // FetchReleaseData fetches all release data for a GitLab compare URL
 // Returns: comparison data (with enriched commits, files, stats), user guidance list, documentation, error
-func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []types.UserGuidance, *types.Documentation, error) {
+// Documentation fetching runs in parallel with diff+guidance for better performance
+func (f *Fetcher) FetchReleaseData(ctx context.Context, compareURL string) (*types.Comparison, []types.UserGuidance, *types.Documentation, error) {
 	slog.Debug("Fetching GitLab release data", "url", compareURL)
 
 	// Parse compare URL
@@ -64,30 +68,49 @@ func (f *Fetcher) FetchReleaseData(compareURL string) (*types.Comparison, []type
 	// Create shared cache to avoid duplicate API calls across operations
 	cache := newMRCache()
 
-	// Fetch comparison and enrich commits with MR metadata and QE labels
-	comparison, err := fetchDiff(context.Background(), f.client, host, projectPath, baseCommit, headCommit, compareURL, cache)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to fetch and enrich comparison: %w", err)
-	}
+	// Run documentation fetching in parallel with diff+guidance
+	g, gCtx := errgroup.WithContext(ctx)
 
-	// Extract user guidance from MRs in the comparison (reuses cached MR objects)
-	userGuidance, err := fetchUserGuidance(context.Background(), f.client, encodedPath, comparison, cache)
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to fetch user guidance: %w", err)
-	}
+	var comparison *types.Comparison
+	var userGuidance []types.UserGuidance
+	var documentation *types.Documentation
 
-	// Fetch documentation
-	docSource := newDocumentationSource(f.client, host, projectPath)
-	owner, name := splitProjectPath(projectPath)
-	baseRepo := types.Repository{
-		Owner: owner,
-		Name:  name,
-		URL:   comparison.RepoURL,
-	}
-	docFetcher := shared.NewDocumentationFetcher(docSource, baseRepo, f.config)
-	documentation, err := docFetcher.FetchAllDocs(context.Background())
-	if err != nil {
-		return nil, nil, nil, fmt.Errorf("failed to fetch documentation: %w", err)
+	// Fetch diff and user guidance (sequential, as guidance depends on diff)
+	g.Go(func() error {
+		var err error
+		comparison, err = fetchDiff(gCtx, f.client, host, projectPath, baseCommit, headCommit, compareURL, cache)
+		if err != nil {
+			return fmt.Errorf("failed to fetch and enrich comparison: %w", err)
+		}
+
+		userGuidance, err = fetchUserGuidance(gCtx, f.client, encodedPath, comparison, cache)
+		if err != nil {
+			return fmt.Errorf("failed to fetch user guidance: %w", err)
+		}
+		return nil
+	})
+
+	// Fetch documentation (independent, runs in parallel)
+	g.Go(func() error {
+		docSource := newDocumentationSource(f.client, host, projectPath)
+		owner, name := splitProjectPath(projectPath)
+		baseRepo := types.Repository{
+			Owner: owner,
+			Name:  name,
+			URL:   fmt.Sprintf("https://%s/%s", host, projectPath),
+		}
+		docFetcher := shared.NewDocumentationFetcher(docSource, baseRepo, f.config)
+
+		var err error
+		documentation, err = docFetcher.FetchAllDocs(gCtx)
+		if err != nil {
+			return fmt.Errorf("failed to fetch documentation: %w", err)
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, nil, nil, err
 	}
 
 	slog.Debug("Release data fetched successfully",
@@ -130,7 +153,9 @@ func urlEncodeProjectPath(projectPath string) string {
 
 // mrCache caches MR objects to avoid duplicate API calls within a single CLI execution.
 // Multiple commits often belong to the same MR, so caching avoids re-fetching.
+// Thread-safe for concurrent access during parallel commit enrichment.
 type mrCache struct {
+	mu            sync.RWMutex
 	mergeRequests map[int64]*gitlabapi.MergeRequest
 }
 
@@ -143,7 +168,10 @@ func (c *mrCache) getOrFetchMR(ctx context.Context, client *gitlabapi.Client, pr
 		return nil, nil
 	}
 
-	if mr, exists := c.mergeRequests[mrIID]; exists {
+	c.mu.RLock()
+	mr, exists := c.mergeRequests[mrIID]
+	c.mu.RUnlock()
+	if exists {
 		slog.Debug("Using cached MR object", "mr", mrIID)
 		return mr, nil
 	}
@@ -154,7 +182,8 @@ func (c *mrCache) getOrFetchMR(ctx context.Context, client *gitlabapi.Client, pr
 	}
 
 	slog.Debug("GitLab API response", "mr", mrIID)
+	c.mu.Lock()
 	c.mergeRequests[mrIID] = mr
-
+	c.mu.Unlock()
 	return mr, nil
 }
