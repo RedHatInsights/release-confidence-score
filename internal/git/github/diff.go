@@ -10,13 +10,14 @@ import (
 	"release-confidence-score/internal/git/types"
 
 	"github.com/google/go-github/v80/github"
+	"golang.org/x/sync/errgroup"
 )
 
-// fetchDiff fetches comparison data from GitHub and enriches commits with PR metadata and QE labels
-// Returns a complete Comparison with enriched commits, files, and stats
+// fetchDiff fetches comparison data from GitHub and augments commits with PR metadata
+// Returns a complete Comparison with augmented commits, files, and stats
 // The cache parameter allows sharing cached PR objects across multiple operations
 func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, head, diffURL string, cache *prCache) (*types.Comparison, error) {
-	slog.Debug("Starting comparison fetch and enrichment", "owner", owner, "repo", repo, "base", base, "head", head)
+	slog.Debug("Starting comparison fetch and commit augmentation", "owner", owner, "repo", repo, "base", base, "head", head)
 
 	// Fetch comparison data with all commits (handles pagination)
 	ghComparison, allCommits, err := fetchComparisonWithPagination(ctx, client, owner, repo, base, head)
@@ -30,33 +31,33 @@ func fetchDiff(ctx context.Context, client *github.Client, owner, repo, base, he
 	comparison := &types.Comparison{
 		RepoURL: fmt.Sprintf("https://github.com/%s/%s", owner, repo),
 		DiffURL: diffURL,
-		Commits: make([]types.Commit, 0, len(allCommits)),
+		Commits: make([]types.Commit, len(allCommits)),
 		Files:   convertFiles(ghComparison.Files),
 		Stats:   calculateStats(ghComparison.Files),
 	}
 
-	// Process each commit for enrichment (PR number, QE labels)
-	for _, commit := range allCommits {
-		commitEntry := buildCommitEntry(ctx, commit, client, owner, repo, cache)
-		if commitEntry != nil {
-			comparison.Commits = append(comparison.Commits, *commitEntry)
-		}
-	}
+	// Process each commit for augmentation in parallel (PR number, QE labels)
+	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(10) // Limit concurrent API calls to avoid rate limiting
 
-	slog.Debug("Commit enrichment complete", "commit_entries", len(comparison.Commits))
+	for i, commit := range allCommits {
+		g.Go(func() error {
+			comparison.Commits[i] = buildCommitEntry(gCtx, client, commit, owner, repo, cache)
+			return nil
+		})
+	}
+	g.Wait()
+
+	slog.Debug("Commit augmentation complete", "commit_entries", len(comparison.Commits))
 
 	return comparison, nil
 }
 
-// buildCommitEntry creates a commit entry from a GitHub commit with PR enrichment
-func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, client *github.Client, owner, repo string, cache *prCache) *types.Commit {
-	if commit == nil || commit.SHA == nil || *commit.SHA == "" {
-		return nil
-	}
-
-	entry := &types.Commit{
-		SHA:      *commit.SHA,
-		ShortSHA: (*commit.SHA)[:8],
+// buildCommitEntry creates a commit entry from a GitHub commit with PR augmentation
+func buildCommitEntry(ctx context.Context, client *github.Client, commit *github.RepositoryCommit, owner, repo string, cache *prCache) types.Commit {
+	entry := types.Commit{
+		SHA:      commit.GetSHA(),
+		ShortSHA: commit.GetSHA()[:8],
 		Message:  "No message",
 		Author:   "Unknown",
 	}
@@ -96,7 +97,7 @@ func buildCommitEntry(ctx context.Context, commit *github.RepositoryCommit, clie
 	// Extract QE testing label
 	entry.QETestingLabel = extractQELabel(pr)
 
-	slog.Debug("Enriched commit", "commit", entry.ShortSHA, "pr", prNumber, "qe_label", entry.QETestingLabel)
+	slog.Debug("Augmented commit", "commit", entry.ShortSHA, "pr", prNumber, "qe_label", entry.QETestingLabel)
 
 	return entry
 }

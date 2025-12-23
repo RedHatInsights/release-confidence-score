@@ -11,13 +11,14 @@ import (
 	"release-confidence-score/internal/git/types"
 
 	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"golang.org/x/sync/errgroup"
 )
 
-// fetchDiff fetches comparison data from GitLab and enriches commits with MR metadata and QE labels
-// Returns a complete Comparison with enriched commits, files, and stats
+// fetchDiff fetches comparison data from GitLab and augments commits with MR metadata
+// Returns a complete Comparison with augmented commits, files, and stats
 // The cache parameter allows sharing cached MR objects across multiple operations
 func fetchDiff(ctx context.Context, client *gitlab.Client, host, projectPath, base, head, diffURL string, cache *mrCache) (*types.Comparison, error) {
-	slog.Debug("Starting comparison fetch and enrichment", "project", projectPath, "base", base, "head", head)
+	slog.Debug("Starting comparison fetch and commit augmentation", "project", projectPath, "base", base, "head", head)
 
 	// URL-encode project path for API calls
 	encodedPath := url.PathEscape(projectPath)
@@ -42,31 +43,31 @@ func fetchDiff(ctx context.Context, client *gitlab.Client, host, projectPath, ba
 	comparison := &types.Comparison{
 		RepoURL: fmt.Sprintf("https://%s/%s", host, projectPath),
 		DiffURL: diffURL,
-		Commits: make([]types.Commit, 0, len(compare.Commits)),
+		Commits: make([]types.Commit, len(compare.Commits)),
 		Files:   files,
 		Stats:   calculateStats(files),
 	}
 
-	// Process each commit for enrichment (MR number, QE labels)
-	for _, commit := range compare.Commits {
-		commitEntry := buildCommitEntry(ctx, commit, client, encodedPath, cache)
-		if commitEntry != nil {
-			comparison.Commits = append(comparison.Commits, *commitEntry)
-		}
-	}
+	// Process each commit for augmentation in parallel (MR number, QE labels)
+	g, gCtx := errgroup.WithContext(ctx)
+	g.SetLimit(10) // Limit concurrent API calls to avoid rate limiting
 
-	slog.Debug("Commit enrichment complete", "commit_entries", len(comparison.Commits))
+	for i, commit := range compare.Commits {
+		g.Go(func() error {
+			comparison.Commits[i] = buildCommitEntry(gCtx, client, commit, encodedPath, cache)
+			return nil
+		})
+	}
+	g.Wait()
+
+	slog.Debug("Commit augmentation complete", "commit_entries", len(comparison.Commits))
 
 	return comparison, nil
 }
 
-// buildCommitEntry creates a commit entry from a GitLab commit with MR enrichment
-func buildCommitEntry(ctx context.Context, commit *gitlab.Commit, client *gitlab.Client, projectPath string, cache *mrCache) *types.Commit {
-	if commit == nil || commit.ID == "" {
-		return nil
-	}
-
-	entry := &types.Commit{
+// buildCommitEntry creates a commit entry from a GitLab commit with MR augmentation
+func buildCommitEntry(ctx context.Context, client *gitlab.Client, commit *gitlab.Commit, projectPath string, cache *mrCache) types.Commit {
+	entry := types.Commit{
 		SHA:      commit.ID,
 		ShortSHA: commit.ShortID,
 		Message:  "No message",
@@ -108,7 +109,7 @@ func buildCommitEntry(ctx context.Context, commit *gitlab.Commit, client *gitlab
 	// Extract QE testing label
 	entry.QETestingLabel = extractQELabel(mr)
 
-	slog.Debug("Enriched commit", "commit", entry.ShortSHA, "mr", mrIID, "qe_label", entry.QETestingLabel)
+	slog.Debug("Augmented commit", "commit", entry.ShortSHA, "mr", mrIID, "qe_label", entry.QETestingLabel)
 
 	return entry
 }

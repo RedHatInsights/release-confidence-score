@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log/slog"
 
-	"gitlab.com/gitlab-org/api/client-go"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
+
+	gitlab "gitlab.com/gitlab-org/api/client-go"
+	"golang.org/x/sync/errgroup"
 )
 
 // fetchUserGuidance extracts user guidance from all MRs in the comparison
@@ -59,52 +61,70 @@ func fetchUserGuidance(ctx context.Context, client *gitlab.Client, projectPath s
 }
 
 // extractUserGuidance extracts all user guidance from a MR's notes
+// Fetches notes and approvers in parallel for better performance
 func extractUserGuidance(ctx context.Context, client *gitlab.Client, projectPath, repoURL string, mr *gitlab.MergeRequest) ([]types.UserGuidance, error) {
 	if mr == nil {
 		return nil, nil
 	}
 
 	mrIID := mr.IID
-	var allGuidance []types.UserGuidance
+
+	// Fetch notes and approvers in parallel
+	g, gCtx := errgroup.WithContext(ctx)
+
+	var allNotes []*gitlab.Note
+	var approvers []string
 
 	// Fetch all notes for this MR with pagination
-	var allNotes []*gitlab.Note
-	opts := &gitlab.ListMergeRequestNotesOptions{
-		ListOptions: gitlab.ListOptions{
-			PerPage: 100,
-			Page:    1,
-		},
-	}
-
-	for {
-		notes, resp, err := client.Notes.ListMergeRequestNotes(projectPath, mrIID, opts)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get notes for MR !%d: %w", mrIID, err)
+	g.Go(func() error {
+		opts := &gitlab.ListMergeRequestNotesOptions{
+			ListOptions: gitlab.ListOptions{
+				PerPage: 100,
+				Page:    1,
+			},
 		}
 
-		allNotes = append(allNotes, notes...)
+		for {
+			notes, resp, err := client.Notes.ListMergeRequestNotes(projectPath, mrIID, opts, gitlab.WithContext(gCtx))
+			if err != nil {
+				return fmt.Errorf("failed to get notes for MR !%d: %w", mrIID, err)
+			}
 
-		if resp.NextPage == 0 {
-			break
+			allNotes = append(allNotes, notes...)
+
+			if resp.NextPage == 0 {
+				break
+			}
+			opts.Page = resp.NextPage
 		}
-		opts.Page = resp.NextPage
-	}
+		return nil
+	})
 
 	// Fetch MR approvers for authorization check
-	approvers, err := getMRApprovers(ctx, client, projectPath, mrIID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get MR approvers for !%d: %w", mrIID, err)
+	g.Go(func() error {
+		var err error
+		approvers, err = getMRApprovers(gCtx, client, projectPath, mrIID)
+		if err != nil {
+			return fmt.Errorf("failed to get MR approvers for !%d: %w", mrIID, err)
+		}
+		return nil
+	})
+
+	if err := g.Wait(); err != nil {
+		return nil, err
 	}
 
-	// Process each note
+	// Process notes sequentially (fast, no API calls)
+	var allGuidance []types.UserGuidance
+
+	mrAuthor := ""
+	if mr.Author != nil {
+		mrAuthor = mr.Author.Username
+	}
+
 	for _, note := range allNotes {
 		if !isValidNote(note) {
 			continue
-		}
-
-		mrAuthor := ""
-		if mr.Author != nil {
-			mrAuthor = mr.Author.Username
 		}
 
 		guidance := processNote(note, mrAuthor, approvers, repoURL, mrIID)

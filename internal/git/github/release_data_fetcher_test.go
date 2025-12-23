@@ -82,13 +82,13 @@ func TestIsCompareURL(t *testing.T) {
 
 func TestParseCompareURL(t *testing.T) {
 	tests := []struct {
-		name       string
-		url        string
-		wantOwner  string
-		wantRepo   string
-		wantBase   string
-		wantHead   string
-		wantErr    bool
+		name      string
+		url       string
+		wantOwner string
+		wantRepo  string
+		wantBase  string
+		wantHead  string
+		wantErr   bool
 	}{
 		{
 			name:      "SHA refs",

@@ -12,7 +12,7 @@ type GitProvider interface {
 	// FetchReleaseData fetches all release data for a compare URL including comparison data
 	// (commits with metadata, files, stats), user guidance, and documentation
 	// Returns: comparison data, user guidance list, documentation, error
-	FetchReleaseData(compareURL string) (*Comparison, []UserGuidance, *Documentation, error)
+	FetchReleaseData(ctx context.Context, compareURL string) (*Comparison, []UserGuidance, *Documentation, error)
 
 	// Name returns the platform name (e.g., "GitHub", "GitLab")
 	Name() string
