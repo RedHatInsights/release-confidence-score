@@ -5,7 +5,7 @@ import (
 )
 
 // Comparison represents a git comparison between two refs, platform-agnostic
-// Combines both raw diff data (files, stats) and enriched commit metadata (SHA, PR#, QE labels)
+// Combines both raw diff data (files, stats) and augmented commit metadata (SHA, PR#, QE labels)
 type Comparison struct {
 	RepoURL string          // Repository URL (e.g., "https://github.com/owner/repo")
 	DiffURL string          // Direct link to the comparison/diff
@@ -22,7 +22,7 @@ type ComparisonStats struct {
 	TotalChanges   int
 }
 
-// Commit represents a single commit with enriched metadata
+// Commit represents a single commit with augmented metadata
 type Commit struct {
 	SHA            string // Full commit SHA
 	ShortSHA       string // Short SHA for display
