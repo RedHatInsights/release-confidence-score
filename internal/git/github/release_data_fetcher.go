@@ -44,7 +44,7 @@ func (f *Fetcher) IsCompareURL(url string) bool {
 }
 
 // FetchReleaseData fetches all release data for a GitHub compare URL
-// Returns: comparison data (with enriched commits, files, stats), user guidance list, documentation, error
+// Returns: comparison data (with augmented commits, files, stats), user guidance list, documentation, error
 // Documentation fetching runs in parallel with diff+guidance for better performance
 func (f *Fetcher) FetchReleaseData(ctx context.Context, compareURL string) (*types.Comparison, []types.UserGuidance, *types.Documentation, error) {
 	slog.Debug("Fetching GitHub release data", "url", compareURL)
