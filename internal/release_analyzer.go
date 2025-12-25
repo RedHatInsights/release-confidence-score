@@ -161,8 +161,7 @@ func (ra *ReleaseAnalyzer) getReleaseData(urls []string) ([]*types.Comparison, [
 			// Fetch all release data (comparison with enriched commits, user guidance, documentation)
 			comparison, userGuidance, docs, err := provider.FetchReleaseData(gCtx, url)
 			if err != nil {
-				slog.Error("Error fetching data", "platform", platformName, "error", err, "url", url)
-				return nil
+				return fmt.Errorf("failed to fetch data from %s: %w", url, err)
 			}
 
 			mu.Lock()
@@ -198,7 +197,9 @@ func (ra *ReleaseAnalyzer) getReleaseData(urls []string) ([]*types.Comparison, [
 		})
 	}
 
-	g.Wait()
+	if err := g.Wait(); err != nil {
+		return nil, nil, nil, err
+	}
 
 	return comparisons, allUserGuidance, documentation, nil
 }
