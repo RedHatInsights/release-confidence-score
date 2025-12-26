@@ -170,6 +170,10 @@ See `.env.example` for a complete configuration template.
 
 ## How RCS Works
 
+![How RCS Works](./how-rcs-works.svg)
+
+[Diagram Source](https://excalidraw.com/#json=RjcXwm-oQ3058cwdpEG9Q,L7hz0svQsJ8PGQuzJraGCg)
+
 ### App-Interface Mode
 1. **App-Interface Data Collection**: Fetches merge request details from GitLab app-interface repository, including diff URLs and user guidance from merge request comments.
 2. **Repository Data Collection**: Retrieves commits, documentation, user guidance, and QE testing labels from GitHub and GitLab repositories being released.
@@ -183,10 +187,6 @@ See `.env.example` for a complete configuration template.
 2. **Data Processing**: Same as app-interface mode - analyzes data, builds changelogs, processes QE labels.
 3. **AI Analysis**: Sends consolidated data with specialized system prompt to the configured AI provider for risk assessment.
 4. **Report Generation**: Produces the same detailed report and prints to stdout.
-
-![How RCS Works](./how-rcs-works.svg)
-
-[Diagram Source](https://excalidraw.com/#json=rx2mPOLX3f5C61e068VE4,WDdT3hHbWEDJ1xDv2EBN5Q)
 
 ## Features
 
