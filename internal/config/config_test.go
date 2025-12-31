@@ -71,6 +71,9 @@ func TestLoad_WithDefaults(t *testing.T) {
 	if cfg.ModelSkipSSLVerify != false {
 		t.Errorf("ModelSkipSSLVerify = %v, expected false (default)", cfg.ModelSkipSSLVerify)
 	}
+	if cfg.GitHubUseGraphQL != false {
+		t.Errorf("GitHubUseGraphQL = %v, expected false (default)", cfg.GitHubUseGraphQL)
+	}
 }
 
 func TestLoad_MissingModelAPI(t *testing.T) {
@@ -221,6 +224,39 @@ func TestLoad_OutOfRangeScoreThreshold(t *testing.T) {
 		t.Fatal("Expected error for out of range score threshold, got none")
 	}
 	if err.Error() != "RCS_SCORE_THRESHOLD_AUTO_DEPLOY must be between 0 and 100, got: 150" {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+func TestLoad_GitHubUseGraphQL(t *testing.T) {
+	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
+	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
+	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
+	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
+	t.Setenv("RCS_GITHUB_USE_GRAPHQL", "true")
+
+	cfg, err := Load(false)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+
+	if !cfg.GitHubUseGraphQL {
+		t.Error("GitHubUseGraphQL should be true")
+	}
+}
+
+func TestLoad_InvalidGitHubUseGraphQL(t *testing.T) {
+	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
+	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
+	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
+	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
+	t.Setenv("RCS_GITHUB_USE_GRAPHQL", "invalid")
+
+	_, err := Load(false)
+	if err == nil {
+		t.Fatal("Expected error for invalid GitHub use GraphQL, got none")
+	}
+	if err.Error() != "RCS_GITHUB_USE_GRAPHQL must be a valid boolean, got: invalid" {
 		t.Errorf("Unexpected error message: %v", err)
 	}
 }

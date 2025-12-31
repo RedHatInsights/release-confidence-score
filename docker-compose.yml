@@ -5,6 +5,7 @@ services:
     environment:
       # GitHub configuration
       - RCS_GITHUB_TOKEN
+      - RCS_GITHUB_USE_GRAPHQL
       # GitLab configuration
       - RCS_GITLAB_BASE_URL
       - RCS_GITLAB_SKIP_SSL_VERIFY

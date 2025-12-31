@@ -1,4 +1,4 @@
-package github
+package shared
 
 import (
 	"testing"
@@ -11,7 +11,7 @@ func TestNewDocumentationSource(t *testing.T) {
 	owner := "test-owner"
 	repo := "test-repo"
 
-	source := newDocumentationSource(client, owner, repo)
+	source := NewDocumentationSource(client, owner, repo)
 
 	if source.client != client {
 		t.Error("client not set correctly")
@@ -28,7 +28,7 @@ func TestGetDefaultBranch_NilDefaultBranch(t *testing.T) {
 	// This test demonstrates the nil handling logic exists
 	// We can't easily test the GitHub API without mocking, but we can test the constructor
 	client := github.NewClient(nil)
-	source := newDocumentationSource(client, "owner", "repo")
+	source := NewDocumentationSource(client, "owner", "repo")
 
 	if source == nil {
 		t.Error("expected non-nil source")
@@ -41,10 +41,10 @@ func TestFetchFileContent_Constructor(t *testing.T) {
 	owner := "test-owner"
 	repo := "test-repo"
 
-	source := newDocumentationSource(client, owner, repo)
+	source := NewDocumentationSource(client, owner, repo)
 
 	// Verify fields are set (can't test actual API calls without complex mocking)
 	if source.owner != owner || source.repo != repo {
-		t.Error("documentationSource fields not set correctly")
+		t.Error("DocumentationSource fields not set correctly")
 	}
 }

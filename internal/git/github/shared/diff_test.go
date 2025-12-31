@@ -1,4 +1,4 @@
-package github
+package shared
 
 import (
 	"testing"
@@ -6,69 +6,10 @@ import (
 	"github.com/google/go-github/v80/github"
 )
 
-func TestExtractQELabel(t *testing.T) {
-	tests := []struct {
-		name     string
-		pr       *github.PullRequest
-		expected string
-	}{
-		{
-			name:     "nil PR",
-			pr:       nil,
-			expected: "",
-		},
-		{
-			name:     "no labels",
-			pr:       &github.PullRequest{Labels: []*github.Label{}},
-			expected: "",
-		},
-		{
-			name: "qe-tested label",
-			pr: &github.PullRequest{
-				Labels: []*github.Label{
-					{Name: github.Ptr("rcs/qe-tested")},
-				},
-			},
-			expected: "rcs/qe-tested",
-		},
-		{
-			name: "needs-qe-testing label",
-			pr: &github.PullRequest{
-				Labels: []*github.Label{
-					{Name: github.Ptr("rcs/needs-qe-testing")},
-				},
-			},
-			expected: "rcs/needs-qe-testing",
-		},
-		{
-			name: "both labels - qe-tested wins",
-			pr: &github.PullRequest{
-				Labels: []*github.Label{
-					{Name: github.Ptr("rcs/needs-qe-testing")},
-					{Name: github.Ptr("rcs/qe-tested")},
-				},
-			},
-			expected: "rcs/qe-tested",
-		},
-		{
-			name: "unrelated labels",
-			pr: &github.PullRequest{
-				Labels: []*github.Label{
-					{Name: github.Ptr("bug")},
-					{Name: github.Ptr("enhancement")},
-				},
-			},
-			expected: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := extractQELabel(tt.pr)
-			if result != tt.expected {
-				t.Errorf("extractQELabel() = %q, want %q", result, tt.expected)
-			}
-		})
+func TestNewRESTClient(t *testing.T) {
+	client := NewRESTClient("test-token")
+	if client == nil {
+		t.Error("expected non-nil client")
 	}
 }
 
@@ -76,7 +17,7 @@ func TestConvertFile(t *testing.T) {
 	tests := []struct {
 		name     string
 		file     *github.CommitFile
-		expected string // Check filename as proxy for correct conversion
+		expected string
 	}{
 		{
 			name:     "nil file",
@@ -107,9 +48,9 @@ func TestConvertFile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertFile(tt.file)
+			result := ConvertFile(tt.file)
 			if result.Filename != tt.expected {
-				t.Errorf("convertFile().Filename = %q, want %q", result.Filename, tt.expected)
+				t.Errorf("ConvertFile().Filename = %q, want %q", result.Filename, tt.expected)
 			}
 		})
 	}
@@ -126,7 +67,7 @@ func TestConvertFileFields(t *testing.T) {
 		PreviousFilename: github.Ptr("src/old.go"),
 	}
 
-	result := convertFile(file)
+	result := ConvertFile(file)
 
 	if result.Filename != "src/main.go" {
 		t.Errorf("Filename = %q, want %q", result.Filename, "src/main.go")
@@ -180,9 +121,9 @@ func TestConvertFiles(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := convertFiles(tt.files)
+			result := ConvertFiles(tt.files)
 			if len(result) != tt.expected {
-				t.Errorf("len(convertFiles()) = %d, want %d", len(result), tt.expected)
+				t.Errorf("len(ConvertFiles()) = %d, want %d", len(result), tt.expected)
 			}
 		})
 	}
@@ -249,7 +190,7 @@ func TestCalculateStats(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := calculateStats(tt.files)
+			result := CalculateStats(tt.files)
 			if result.TotalFiles != tt.expectedFiles {
 				t.Errorf("TotalFiles = %d, want %d", result.TotalFiles, tt.expectedFiles)
 			}
@@ -261,6 +202,79 @@ func TestCalculateStats(t *testing.T) {
 			}
 			if result.TotalChanges != tt.expectedAdditions+tt.expectedDeletions {
 				t.Errorf("TotalChanges = %d, want %d", result.TotalChanges, tt.expectedAdditions+tt.expectedDeletions)
+			}
+		})
+	}
+}
+
+func TestBuildBasicCommitEntry(t *testing.T) {
+	tests := []struct {
+		name        string
+		commit      *github.RepositoryCommit
+		wantSHA     string
+		wantShort   string
+		wantMessage string
+		wantAuthor  string
+	}{
+		{
+			name: "complete commit",
+			commit: &github.RepositoryCommit{
+				SHA: github.Ptr("abc123def456789012345678901234567890abcd"),
+				Commit: &github.Commit{
+					Message: github.Ptr("Fix bug in parser"),
+					Author:  &github.CommitAuthor{Name: github.Ptr("John Doe")},
+				},
+			},
+			wantSHA:     "abc123def456789012345678901234567890abcd",
+			wantShort:   "abc123de",
+			wantMessage: "Fix bug in parser",
+			wantAuthor:  "John Doe",
+		},
+		{
+			name: "multiline message",
+			commit: &github.RepositoryCommit{
+				SHA: github.Ptr("def456abc789012345678901234567890abcdef12"),
+				Commit: &github.Commit{
+					Message: github.Ptr("Add feature\n\nDetailed description here"),
+					Author:  &github.CommitAuthor{Name: github.Ptr("Jane Smith")},
+				},
+			},
+			wantSHA:     "def456abc789012345678901234567890abcdef12",
+			wantShort:   "def456ab",
+			wantMessage: "Add feature",
+			wantAuthor:  "Jane Smith",
+		},
+		{
+			name: "empty message and author",
+			commit: &github.RepositoryCommit{
+				SHA: github.Ptr("1234567890abcdef1234567890abcdef12345678"),
+				Commit: &github.Commit{
+					Message: github.Ptr(""),
+					Author:  &github.CommitAuthor{Name: github.Ptr("")},
+				},
+			},
+			wantSHA:     "1234567890abcdef1234567890abcdef12345678",
+			wantShort:   "12345678",
+			wantMessage: "No message",
+			wantAuthor:  "Unknown",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := BuildBasicCommitEntry(tt.commit)
+
+			if result.SHA != tt.wantSHA {
+				t.Errorf("SHA = %q, want %q", result.SHA, tt.wantSHA)
+			}
+			if result.ShortSHA != tt.wantShort {
+				t.Errorf("ShortSHA = %q, want %q", result.ShortSHA, tt.wantShort)
+			}
+			if result.Message != tt.wantMessage {
+				t.Errorf("Message = %q, want %q", result.Message, tt.wantMessage)
+			}
+			if result.Author != tt.wantAuthor {
+				t.Errorf("Author = %q, want %q", result.Author, tt.wantAuthor)
 			}
 		})
 	}
