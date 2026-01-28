@@ -3,7 +3,7 @@ package github
 import (
 	"testing"
 
-	"github.com/google/go-github/v80/github"
+	"github.com/google/go-github/v82/github"
 )
 
 func TestExtractQELabel(t *testing.T) {
