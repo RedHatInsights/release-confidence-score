@@ -155,6 +155,9 @@ For Llama:
 - `RCS_MODEL_TIMEOUT_SECONDS`: Request timeout in seconds (default: 120).
 - `RCS_SYSTEM_PROMPT_VERSION`: System prompt version to use (default: v1).
 
+**GitHub Configuration:**
+- `RCS_GITHUB_USE_GRAPHQL`: Use GraphQL API instead of REST for PR data (default: false). GraphQL reduces API calls when fetching PR comments and reviews.
+
 **GitLab Configuration:**
 - `RCS_GITLAB_SKIP_SSL_VERIFY`: Skip SSL verification (default: false).
 

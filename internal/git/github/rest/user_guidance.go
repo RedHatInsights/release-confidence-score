@@ -1,4 +1,4 @@
-package github
+package rest
 
 import (
 	"context"
@@ -6,14 +6,15 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/go-github/v80/github"
-	"golang.org/x/sync/errgroup"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
+
+	"github.com/google/go-github/v80/github"
+	"golang.org/x/sync/errgroup"
 )
 
-// fetchUserGuidance extracts user guidance from all PRs in the comparison
-// The cache parameter allows reusing PR objects already fetched during diff enrichment
+// fetchUserGuidance extracts user guidance from all PRs using REST API
+// The cache parameter allows reusing PR objects already fetched during diff augmentation
 func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo string, comparison *types.Comparison, cache *prCache) ([]types.UserGuidance, error) {
 	if comparison == nil || len(comparison.Commits) == 0 {
 		return []types.UserGuidance{}, nil
@@ -34,7 +35,7 @@ func fetchUserGuidance(ctx context.Context, client *github.Client, owner, repo s
 
 		processedPRs[commit.PRNumber] = true
 
-		// Get PR object (uses cache populated during diff enrichment)
+		// Get PR object (uses cache populated during diff augmentation)
 		pr, err := cache.getOrFetchPR(ctx, client, owner, repo, int(commit.PRNumber))
 		if err != nil {
 			return nil, fmt.Errorf("failed to fetch PR #%d for guidance extraction: %w", commit.PRNumber, err)
@@ -186,10 +187,7 @@ func isValidIssueComment(comment *github.IssueComment) bool {
 	if comment.GetUser() == nil || comment.GetUser().GetLogin() == "" {
 		return false
 	}
-	if comment.GetHTMLURL() == "" {
-		return false
-	}
-	return true
+	return comment.GetHTMLURL() != ""
 }
 
 // isValidReviewComment checks if a review comment has all required fields
@@ -200,10 +198,7 @@ func isValidReviewComment(comment *github.PullRequestComment) bool {
 	if comment.GetUser() == nil || comment.GetUser().GetLogin() == "" {
 		return false
 	}
-	if comment.GetHTMLURL() == "" {
-		return false
-	}
-	return true
+	return comment.GetHTMLURL() != ""
 }
 
 // isAuthorized checks if a user is authorized to provide guidance
