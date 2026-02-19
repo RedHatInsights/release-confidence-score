@@ -129,28 +129,35 @@ func stripMarkdownCodeBlocks(content string) string {
 
 func getReleaseRecommendation(score, autoDeployThreshold, reviewRequiredThreshold int) string {
 	if score >= autoDeployThreshold {
-		return "✅ RECOMMENDED FOR RELEASE"
+		return "✅ Recommended for release"
 	} else if score >= reviewRequiredThreshold {
-		return "⚠️ MANUAL REVIEW REQUIRED"
+		return "⚠️ **MANUAL REVIEW REQUIRED**"
 	} else {
-		return "🚫 RELEASE NOT RECOMMENDED"
+		return "🚫 **RELEASE NOT RECOMMENDED**"
 	}
 }
 
-// StructuredAnalysis represents the LLM's analysis output in a structured format
+// StructuredAnalysis represents the LLM's analysis output in a structured format (v2 schema)
 type StructuredAnalysis struct {
-	Score                        int               `json:"score"`
-	SystemImpactVisual           string            `json:"system_impact_visual"`
-	ChangeCharacteristicsVisual  string            `json:"change_characteristics_visual"`
-	ActionItems                  ActionItems       `json:"action_items"`
-	CodeAnalysis                 TechnicalAnalysis `json:"code_analysis"`
-	InfrastructureAnalysis       TechnicalAnalysis `json:"infrastructure_analysis"`
-	DependencyAnalysis           TechnicalAnalysis `json:"dependency_analysis"`
-	PositiveFactors              string            `json:"positive_factors"`
-	RiskFactors                  string            `json:"risk_factors"`
-	BlockingIssues               string            `json:"blocking_issues"`
-	DocumentationQuality         string            `json:"documentation_quality"`
-	DocumentationRecommendations string            `json:"documentation_recommendations"`
+	Score                        int              `json:"score"`
+	Summary                      string           `json:"summary"`
+	RiskSummary                  RiskSummary      `json:"risk_summary"`
+	ActionItems                  ActionItems      `json:"action_items"`
+	TechnicalDetails             TechnicalDetails `json:"technical_details"`
+	DocumentationQuality         string           `json:"documentation_quality"`
+	DocumentationRecommendations string           `json:"documentation_recommendations"`
+}
+
+// RiskSummary consolidates all risk-related information
+type RiskSummary struct {
+	Concerns  []RiskConcern `json:"concerns"`
+	Positives []string      `json:"positives"`
+}
+
+// RiskConcern represents a single risk with severity
+type RiskConcern struct {
+	Severity    string `json:"severity"`
+	Description string `json:"description"`
 }
 
 // ActionItems represents categorized action items
@@ -160,11 +167,11 @@ type ActionItems struct {
 	Followup  []string `json:"followup"`
 }
 
-// TechnicalAnalysis represents detailed technical analysis with structured facts
-type TechnicalAnalysis struct {
-	Summary     string   `json:"summary"`
-	KeyFindings []string `json:"key_findings"`
-	RiskFactors []string `json:"risk_factors"`
+// TechnicalDetails contains findings organized by area
+type TechnicalDetails struct {
+	Code           []string `json:"code"`
+	Infrastructure []string `json:"infrastructure"`
+	Dependencies   []string `json:"dependencies"`
 }
 
 // ReportMetadata contains metadata for template replacement
