@@ -317,42 +317,42 @@ func TestGetReleaseRecommendation(t *testing.T) {
 			90,
 			80,
 			60,
-			"✅ RECOMMENDED FOR RELEASE",
+			"✅ Recommended for release",
 		},
 		{
 			"at auto deploy threshold",
 			80,
 			80,
 			60,
-			"✅ RECOMMENDED FOR RELEASE",
+			"✅ Recommended for release",
 		},
 		{
 			"manual review",
 			70,
 			80,
 			60,
-			"⚠️ MANUAL REVIEW REQUIRED",
+			"⚠️ **MANUAL REVIEW REQUIRED**",
 		},
 		{
 			"at review threshold",
 			60,
 			80,
 			60,
-			"⚠️ MANUAL REVIEW REQUIRED",
+			"⚠️ **MANUAL REVIEW REQUIRED**",
 		},
 		{
 			"not recommended",
 			50,
 			80,
 			60,
-			"🚫 RELEASE NOT RECOMMENDED",
+			"🚫 **RELEASE NOT RECOMMENDED**",
 		},
 		{
 			"very low score",
 			10,
 			80,
 			60,
-			"🚫 RELEASE NOT RECOMMENDED",
+			"🚫 **RELEASE NOT RECOMMENDED**",
 		},
 	}
 
@@ -391,34 +391,24 @@ func TestTemplateFuncs(t *testing.T) {
 }
 
 func TestGenerateReport(t *testing.T) {
-	// Test with minimal valid JSON
+	// Test with minimal valid JSON (v2 schema)
 	minimalJSON := `{
 		"score": 85,
-		"system_impact_visual": "Low impact",
-		"change_characteristics_visual": "Bug fix",
+		"summary": "Bug fix with low impact",
+		"risk_summary": {
+			"concerns": [],
+			"positives": ["Well tested"]
+		},
 		"action_items": {
 			"critical": [],
 			"important": [],
 			"followup": []
 		},
-		"code_analysis": {
-			"summary": "Code looks good",
-			"key_findings": [],
-			"risk_factors": []
+		"technical_details": {
+			"code": ["Code looks good"],
+			"infrastructure": [],
+			"dependencies": []
 		},
-		"infrastructure_analysis": {
-			"summary": "No infrastructure changes",
-			"key_findings": [],
-			"risk_factors": []
-		},
-		"dependency_analysis": {
-			"summary": "Dependencies updated",
-			"key_findings": [],
-			"risk_factors": []
-		},
-		"positive_factors": "Well tested",
-		"risk_factors": "None",
-		"blocking_issues": "",
 		"documentation_quality": "Good",
 		"documentation_recommendations": "None"
 	}`
@@ -450,12 +440,10 @@ func TestGenerateReport(t *testing.T) {
 	// Check that the report contains expected sections
 	expectedSections := []string{
 		"Release Confidence Report",
-		"Confidence Score: **85/100**",
-		"✅ RECOMMENDED FOR RELEASE",
-		"Technical Analysis",
-		"Code Impact Analysis",
-		"Infrastructure & Deployment Impact",
-		"Dependencies & Integration Impact",
+		"85/100",
+		"Recommended for release",
+		"Technical Details",
+		"Code Changes",
 	}
 
 	for _, section := range expectedSections {
@@ -482,31 +470,21 @@ func TestGenerateReportInvalidJSON(t *testing.T) {
 func TestGenerateReportWithUserGuidance(t *testing.T) {
 	jsonResponse := `{
 		"score": 75,
-		"system_impact_visual": "Medium impact",
-		"change_characteristics_visual": "Feature addition",
+		"summary": "New feature addition with medium impact",
+		"risk_summary": {
+			"concerns": [{"severity": "medium", "description": "Needs testing"}],
+			"positives": ["Well structured", "Clean code"]
+		},
 		"action_items": {
 			"critical": ["Test thoroughly"],
 			"important": ["Update docs"],
 			"followup": []
 		},
-		"code_analysis": {
-			"summary": "New feature added",
-			"key_findings": ["Clean code"],
-			"risk_factors": ["Needs testing"]
+		"technical_details": {
+			"code": ["New feature added"],
+			"infrastructure": [],
+			"dependencies": []
 		},
-		"infrastructure_analysis": {
-			"summary": "No changes",
-			"key_findings": [],
-			"risk_factors": []
-		},
-		"dependency_analysis": {
-			"summary": "Dependencies updated",
-			"key_findings": [],
-			"risk_factors": []
-		},
-		"positive_factors": "Well structured",
-		"risk_factors": "Limited testing",
-		"blocking_issues": "",
 		"documentation_quality": "Adequate",
 		"documentation_recommendations": "Add examples"
 	}`
@@ -581,15 +559,10 @@ func TestGenerateReportWithUserGuidance(t *testing.T) {
 func TestGenerateReportWithComparisons(t *testing.T) {
 	jsonResponse := `{
 		"score": 80,
-		"system_impact_visual": "Low impact",
-		"change_characteristics_visual": "Bug fix",
+		"summary": "Bug fix with low impact",
+		"risk_summary": {"concerns": [], "positives": ["Tested"]},
 		"action_items": {"critical": [], "important": [], "followup": []},
-		"code_analysis": {"summary": "Good", "key_findings": [], "risk_factors": []},
-		"infrastructure_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"dependency_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"positive_factors": "Tested",
-		"risk_factors": "None",
-		"blocking_issues": "",
+		"technical_details": {"code": ["Good"], "infrastructure": [], "dependencies": []},
 		"documentation_quality": "Good",
 		"documentation_recommendations": "None"
 	}`
@@ -639,8 +612,8 @@ func TestGenerateReportWithComparisons(t *testing.T) {
 	}
 
 	// Verify changelog section
-	if !strings.Contains(report, "Release Changelogs") {
-		t.Error("GenerateReport() report missing Release Changelogs section")
+	if !strings.Contains(report, "Changelogs") {
+		t.Error("GenerateReport() report missing Changelogs section")
 	}
 
 	// Verify commits are included
@@ -676,15 +649,10 @@ func TestGenerateReportWithComparisons(t *testing.T) {
 func TestGenerateReportWithDocumentation(t *testing.T) {
 	jsonResponse := `{
 		"score": 90,
-		"system_impact_visual": "Low impact",
-		"change_characteristics_visual": "Documentation",
+		"summary": "Documentation update with low impact",
+		"risk_summary": {"concerns": [], "positives": ["Well documented"]},
 		"action_items": {"critical": [], "important": [], "followup": []},
-		"code_analysis": {"summary": "Good", "key_findings": [], "risk_factors": []},
-		"infrastructure_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"dependency_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"positive_factors": "Well documented",
-		"risk_factors": "None",
-		"blocking_issues": "",
+		"technical_details": {"code": [], "infrastructure": [], "dependencies": []},
 		"documentation_quality": "Excellent",
 		"documentation_recommendations": "Keep it up"
 	}`
@@ -749,15 +717,10 @@ func TestGenerateReportWithDocumentation(t *testing.T) {
 func TestGenerateReportWithTruncation(t *testing.T) {
 	jsonResponse := `{
 		"score": 70,
-		"system_impact_visual": "Medium impact",
-		"change_characteristics_visual": "Large change",
+		"summary": "Large change with medium impact",
+		"risk_summary": {"concerns": [{"severity": "medium", "description": "Large diff"}], "positives": ["Structured"]},
 		"action_items": {"critical": [], "important": [], "followup": []},
-		"code_analysis": {"summary": "Good", "key_findings": [], "risk_factors": []},
-		"infrastructure_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"dependency_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"positive_factors": "Structured",
-		"risk_factors": "Large diff",
-		"blocking_issues": "",
+		"technical_details": {"code": [], "infrastructure": [], "dependencies": []},
 		"documentation_quality": "Good",
 		"documentation_recommendations": "None"
 	}`
@@ -801,15 +764,10 @@ func TestGenerateReportWithTruncation(t *testing.T) {
 func TestGenerateReportWithAggressiveTruncation(t *testing.T) {
 	jsonResponse := `{
 		"score": 65,
-		"system_impact_visual": "High impact",
-		"change_characteristics_visual": "Very large change",
+		"summary": "Very large change with high impact",
+		"risk_summary": {"concerns": [{"severity": "high", "description": "Very large diff"}], "positives": ["Structured"]},
 		"action_items": {"critical": [], "important": [], "followup": []},
-		"code_analysis": {"summary": "Good", "key_findings": [], "risk_factors": []},
-		"infrastructure_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"dependency_analysis": {"summary": "None", "key_findings": [], "risk_factors": []},
-		"positive_factors": "Structured",
-		"risk_factors": "Very large diff",
-		"blocking_issues": "",
+		"technical_details": {"code": [], "infrastructure": [], "dependencies": []},
 		"documentation_quality": "Good",
 		"documentation_recommendations": "None"
 	}`
