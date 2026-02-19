@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	githubapi "github.com/google/go-github/v80/github"
+	githubapi "github.com/google/go-github/v83/github"
 	"golang.org/x/sync/errgroup"
 	"release-confidence-score/internal/config"
 	"release-confidence-score/internal/git/shared"
