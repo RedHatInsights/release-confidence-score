@@ -11,6 +11,7 @@ Whether you're making manual release decisions or using automated gates in your 
 
 - **Objective Confidence Scores**: Clear 0-100 ratings with consistent evaluation criteria across all releases.
 - **Comprehensive Risk Analysis**: Detects critical risks including database migrations, authentication changes, API contracts, infrastructure modifications, and dependency updates.
+- **Compound Risk Detection**: Identifies dangerous risk combinations where individually moderate changes interact to create critical scenarios — such as database migrations paired with code that depends on the new schema, or retry count and timeout increases that independently look safe but combined can exceed SLO budgets.
 - **Smart Context Integration**: Leverages repository documentation, QE test results, and user guidance comments for informed recommendations.
 - **Actionable Reports**: Categorized action items (critical/important/follow-up) with specific release guidance and risk mitigation steps.
 
@@ -21,6 +22,8 @@ Whether you're making manual release decisions or using automated gates in your 
 - **Save Time**: Automated analysis of diffs, changelogs, and documentation in one comprehensive report.
 - **Prevent Production Issues**: Identify high-risk changes before they reach users.
 - **Scale Your Expertise**: Apply seasoned release judgment consistently across all releases.
+
+See [DEMO_CONFIDENCE_REPORT.md](docs/DEMO_CONFIDENCE_REPORT.md) for an example of a generated confidence report.
 
 ## Prerequisites
 
@@ -178,14 +181,14 @@ See `.env.example` for a complete configuration template.
 1. **App-Interface Data Collection**: Fetches merge request details from GitLab app-interface repository, including diff URLs and user guidance from merge request comments.
 2. **Repository Data Collection**: Retrieves commits, documentation, user guidance, and QE testing labels from GitHub and GitLab repositories being released.
 3. **Data Processing**: Analyzes and formats collected data, builds changelogs from commits, processes QE testing labels to assess test coverage, and prepares consolidated context for AI analysis.
-4. **AI Analysis**: Sends consolidated data with specialized system prompt to the configured AI provider for risk assessment.
-5. **Report Generation**: Produces a detailed report with confidence score, risk factors, release recommendations, changelogs, user guidance (with author authorization status), diff truncation details when applicable, and tips for improving future analysis with better documentation.
+4. **AI Analysis**: Sends consolidated data with specialized system prompt to the configured AI provider for risk assessment, including individual risk evaluation and compound risk detection across changes.
+5. **Report Generation**: Produces a detailed report with confidence score, risk analysis (concerns and positive factors), categorized action items (critical/important/follow-up), technical details (code, infrastructure, dependencies), changelogs, user guidance (with author authorization status), documentation quality assessment, diff truncation details when applicable, and tips for improving future analysis.
 6. **Optional MR Posting**: If `--post-to-mr` flag is used, posts the report as a comment on the merge request.
 
 ### Standalone Mode
 1. **Repository Data Collection**: Directly analyzes the provided GitHub/GitLab compare URLs, retrieving commits, documentation, user guidance, and QE testing labels.
 2. **Data Processing**: Same as app-interface mode - analyzes data, builds changelogs, processes QE labels.
-3. **AI Analysis**: Sends consolidated data with specialized system prompt to the configured AI provider for risk assessment.
+3. **AI Analysis**: Sends consolidated data with specialized system prompt to the configured AI provider for risk assessment, including individual risk evaluation and compound risk detection across changes.
 4. **Report Generation**: Produces the same detailed report and prints to stdout.
 
 ## Features
