@@ -10,7 +10,7 @@ import (
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 
-	gitlabapi "gitlab.com/gitlab-org/api/client-go"
+	gitlabapi "gitlab.com/gitlab-org/api/client-go/v2"
 )
 
 const (

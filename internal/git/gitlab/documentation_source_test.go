@@ -3,7 +3,7 @@ package gitlab
 import (
 	"testing"
 
-	gitlab "gitlab.com/gitlab-org/api/client-go"
+	gitlab "gitlab.com/gitlab-org/api/client-go/v2"
 )
 
 func TestNewDocumentationSource(t *testing.T) {
