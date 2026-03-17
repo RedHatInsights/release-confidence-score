@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/google/go-github/v84 v84.0.0
-	gitlab.com/gitlab-org/api/client-go v1.46.0
+	gitlab.com/gitlab-org/api/client-go/v2 v2.7.0
 	golang.org/x/sync v0.20.0
 )
 

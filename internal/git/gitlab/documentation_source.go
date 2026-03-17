@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/url"
 
-	gitlab "gitlab.com/gitlab-org/api/client-go"
+	gitlab "gitlab.com/gitlab-org/api/client-go/v2"
 )
 
 // documentationSource implements DocumentationSource interface for GitLab
