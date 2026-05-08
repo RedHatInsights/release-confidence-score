@@ -8,7 +8,7 @@ import (
 
 	"release-confidence-score/internal/git/types"
 
-	"github.com/google/go-github/v84/github"
+	"github.com/google/go-github/v86/github"
 )
 
 func TestIsValidIssueComment(t *testing.T) {
