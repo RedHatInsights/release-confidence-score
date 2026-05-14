@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/oauth2"
+
 	"release-confidence-score/internal/config"
 	httputil "release-confidence-score/internal/http"
 	llmerrors "release-confidence-score/internal/llm/errors"
@@ -16,7 +18,8 @@ import (
 )
 
 type GeminiClient struct {
-	config *config.Config
+	config      *config.Config
+	tokenSource oauth2.TokenSource
 }
 
 type GeminiRequest struct {
@@ -46,8 +49,8 @@ type GeminiUsage struct {
 	TotalTokens      int `json:"total_tokens"`
 }
 
-func NewGemini(cfg *config.Config) LLMClient {
-	return &GeminiClient{config: cfg}
+func NewGemini(cfg *config.Config, ts oauth2.TokenSource) LLMClient {
+	return &GeminiClient{config: cfg, tokenSource: ts}
 }
 
 func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
@@ -80,7 +83,12 @@ func (g *GeminiClient) Analyze(userPrompt string) (string, error) {
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.ModelUserKey)
+
+	tok, err := g.tokenSource.Token()
+	if err != nil {
+		return "", fmt.Errorf("failed to obtain authentication token")
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 
 	httpClient := httputil.NewHTTPClient(httputil.HTTPClientOptions{
 		Timeout:       time.Duration(cfg.ModelTimeoutSeconds) * time.Second,

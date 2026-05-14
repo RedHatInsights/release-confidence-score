@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"os"
 	"slices"
@@ -15,6 +16,7 @@ var (
 )
 
 type Config struct {
+	GCPServiceAccountKey   []byte
 	GitHubToken            string
 	GitLabBaseURL          string
 	GitLabSkipSSLVerify    bool
@@ -27,7 +29,6 @@ type Config struct {
 	ModelProvider          string
 	ModelSkipSSLVerify     bool
 	ModelTimeoutSeconds    int
-	ModelUserKey           string
 	ScoreThresholds        ScoreThresholds
 	SystemPromptVersion    string
 }
@@ -59,14 +60,13 @@ func Load(isAppInterfaceMode bool) (*Config, error) {
 	prefix := strings.ToUpper(modelProvider)
 	modelAPI := os.Getenv(fmt.Sprintf("RCS_%s_MODEL_API", prefix))
 	modelID := os.Getenv(fmt.Sprintf("RCS_%s_MODEL_ID", prefix))
-	modelUserKey := os.Getenv(fmt.Sprintf("RCS_%s_USER_KEY", prefix))
 
 	modelSkipSSL, err := parseBoolEnvOrDefault("RCS_MODEL_SKIP_SSL_VERIFY", false)
 	if err != nil {
 		return nil, err
 	}
 
-	modelMaxResponseTokens, err := parseIntEnvOrDefault("RCS_MODEL_MAX_RESPONSE_TOKENS", 2000, 1, 1000000000)
+	modelMaxResponseTokens, err := parseIntEnvOrDefault("RCS_MODEL_MAX_RESPONSE_TOKENS", 4096, 1, 1000000000)
 	if err != nil {
 		return nil, err
 	}
@@ -85,11 +85,18 @@ func Load(isAppInterfaceMode bool) (*Config, error) {
 		return nil, err
 	}
 
+	// Parse GCP service account key
+	gcpSAKey, err := parseGCPServiceAccountKey()
+	if err != nil {
+		return nil, err
+	}
+
 	// Parse system prompt version
 	systemPromptVersion := getEnvOrDefault("RCS_SYSTEM_PROMPT_VERSION", "v1")
 
 	// Build config struct
 	cfg := &Config{
+		GCPServiceAccountKey:   gcpSAKey,
 		GitHubToken:            gitHubToken,
 		GitLabBaseURL:          gitLabBaseURL,
 		GitLabSkipSSLVerify:    gitLabSkipSSL,
@@ -102,7 +109,6 @@ func Load(isAppInterfaceMode bool) (*Config, error) {
 		ModelProvider:          modelProvider,
 		ModelSkipSSLVerify:     modelSkipSSL,
 		ModelTimeoutSeconds:    modelTimeoutSeconds,
-		ModelUserKey:           modelUserKey,
 		ScoreThresholds: ScoreThresholds{
 			AutoDeploy:     autoDeploy,
 			ReviewRequired: reviewRequired,
@@ -193,10 +199,6 @@ func validateConfig(cfg *Config, isAppInterfaceMode bool, modelProviderPrefix st
 	if cfg.ModelID == "" {
 		return fmt.Errorf("RCS_%s_MODEL_ID environment variable is required", modelProviderPrefix)
 	}
-	if cfg.ModelUserKey == "" {
-		return fmt.Errorf("RCS_%s_USER_KEY environment variable is required", modelProviderPrefix)
-	}
-
 	// Validate score threshold logic
 	if cfg.ScoreThresholds.AutoDeploy < cfg.ScoreThresholds.ReviewRequired {
 		return fmt.Errorf("RCS_SCORE_THRESHOLD_AUTO_DEPLOY (%d) must be greater than or equal to RCS_SCORE_THRESHOLD_REVIEW_REQUIRED (%d)",
@@ -204,4 +206,16 @@ func validateConfig(cfg *Config, isAppInterfaceMode bool, modelProviderPrefix st
 	}
 
 	return nil
+}
+
+func parseGCPServiceAccountKey() ([]byte, error) {
+	raw := os.Getenv("GOOGLE_SA_KEY_B64")
+	if raw == "" {
+		return nil, fmt.Errorf("GOOGLE_SA_KEY_B64 environment variable is required")
+	}
+	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(raw))
+	if err != nil {
+		return nil, fmt.Errorf("GOOGLE_SA_KEY_B64 contains invalid base64 encoding")
+	}
+	return decoded, nil
 }

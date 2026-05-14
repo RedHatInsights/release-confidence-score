@@ -3,17 +3,18 @@ package providers
 import (
 	"fmt"
 
+	"golang.org/x/oauth2"
+
 	"release-confidence-score/internal/config"
 )
 
-// NewClient creates the appropriate LLM client based on configuration
-func NewClient(cfg *config.Config) (LLMClient, error) {
+func NewClient(cfg *config.Config, ts oauth2.TokenSource) (LLMClient, error) {
 	switch cfg.ModelProvider {
 	case "claude":
-		return NewClaude(cfg), nil
+		return NewClaude(cfg, ts), nil
 
 	case "gemini":
-		return NewGemini(cfg), nil
+		return NewGemini(cfg, ts), nil
 
 	default:
 		return nil, fmt.Errorf("unsupported model provider: %s", cfg.ModelProvider)

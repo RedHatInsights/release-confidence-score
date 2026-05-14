@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"time"
 
+	"golang.org/x/oauth2"
+
 	"release-confidence-score/internal/config"
 	httputil "release-confidence-score/internal/http"
 	llmerrors "release-confidence-score/internal/llm/errors"
@@ -16,7 +18,8 @@ import (
 )
 
 type ClaudeClient struct {
-	config *config.Config
+	config      *config.Config
+	tokenSource oauth2.TokenSource
 }
 
 type ClaudeRequest struct {
@@ -47,15 +50,15 @@ type ClaudeUsage struct {
 	OutputTokens int `json:"output_tokens"`
 }
 
-func NewClaude(cfg *config.Config) LLMClient {
-	return &ClaudeClient{config: cfg}
+func NewClaude(cfg *config.Config, ts oauth2.TokenSource) LLMClient {
+	return &ClaudeClient{config: cfg, tokenSource: ts}
 }
 
 func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 	cfg := c.config
 
 	// Build Claude-specific endpoint
-	endpoint := fmt.Sprintf("%s/sonnet/models/%s:streamRawPredict", cfg.ModelAPI, cfg.ModelID)
+	endpoint := fmt.Sprintf("%s/anthropic/models/%s:streamRawPredict", cfg.ModelAPI, cfg.ModelID)
 
 	// Create HTTP client
 	httpClient := httputil.NewHTTPClient(httputil.HTTPClientOptions{
@@ -89,7 +92,12 @@ func (c *ClaudeClient) Analyze(userPrompt string) (string, error) {
 	}
 
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("Authorization", "Bearer "+cfg.ModelUserKey)
+
+	tok, err := c.tokenSource.Token()
+	if err != nil {
+		return "", fmt.Errorf("failed to obtain authentication token")
+	}
+	httpReq.Header.Set("Authorization", "Bearer "+tok.AccessToken)
 
 	slog.Debug("Sending release analysis request to LLM", "provider", "Claude", "model", cfg.ModelID)
 

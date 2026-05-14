@@ -2,14 +2,35 @@ package providers
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"golang.org/x/oauth2"
+
 	"release-confidence-score/internal/config"
 	llmerrors "release-confidence-score/internal/llm/errors"
 )
+
+type staticTokenSource struct {
+	token string
+}
+
+func (s *staticTokenSource) Token() (*oauth2.Token, error) {
+	return &oauth2.Token{AccessToken: s.token}, nil
+}
+
+func mockTS() oauth2.TokenSource {
+	return &staticTokenSource{token: "test-token"}
+}
+
+type errorTokenSource struct{}
+
+func (e *errorTokenSource) Token() (*oauth2.Token, error) {
+	return nil, errors.New("token refresh failed")
+}
 
 func TestNewClaude(t *testing.T) {
 	cfg := &config.Config{
@@ -17,7 +38,7 @@ func TestNewClaude(t *testing.T) {
 		ModelID:       "claude-3-sonnet",
 	}
 
-	client := NewClaude(cfg)
+	client := NewClaude(cfg, mockTS())
 
 	if client == nil {
 		t.Fatal("NewClaude() returned nil")
@@ -45,8 +66,8 @@ func TestClaudeAnalyze_Success(t *testing.T) {
 			t.Errorf("Expected Content-Type: application/json, got %s", r.Header.Get("Content-Type"))
 		}
 
-		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-			t.Errorf("Expected Authorization header with Bearer token")
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Authorization: Bearer test-token, got %s", r.Header.Get("Authorization"))
 		}
 
 		// Send successful response
@@ -68,13 +89,12 @@ func TestClaudeAnalyze_Success(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "claude-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewClaude(cfg)
+	client := NewClaude(cfg, mockTS())
 	result, err := client.Analyze("test prompt")
 
 	if err != nil {
@@ -105,13 +125,12 @@ func TestClaudeAnalyze_EmptyResponse(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "claude-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewClaude(cfg)
+	client := NewClaude(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {
@@ -133,13 +152,12 @@ func TestClaudeAnalyze_HTTPError(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "claude-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewClaude(cfg)
+	client := NewClaude(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {
@@ -162,13 +180,12 @@ func TestClaudeAnalyze_ContextWindowError(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "claude-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewClaude(cfg)
+	client := NewClaude(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {
@@ -190,6 +207,26 @@ func TestClaudeAnalyze_ContextWindowError(t *testing.T) {
 	}
 }
 
+func TestClaudeAnalyze_TokenError(t *testing.T) {
+	cfg := &config.Config{
+		ModelAPI:               "http://unused",
+		ModelID:                "claude-test",
+		ModelTimeoutSeconds:    30,
+		ModelMaxResponseTokens: 1000,
+		SystemPromptVersion:    "v1",
+	}
+
+	client := NewClaude(cfg, &errorTokenSource{})
+	_, err := client.Analyze("test prompt")
+
+	if err == nil {
+		t.Fatal("Analyze() expected error for token failure, got nil")
+	}
+	if !strings.Contains(err.Error(), "authentication token") {
+		t.Errorf("Analyze() error = %q, want error containing 'authentication token'", err.Error())
+	}
+}
+
 func TestClaudeAnalyze_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -200,13 +237,12 @@ func TestClaudeAnalyze_InvalidJSON(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "claude-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewClaude(cfg)
+	client := NewClaude(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {

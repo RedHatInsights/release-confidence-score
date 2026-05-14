@@ -49,7 +49,7 @@ func TestNewClient(t *testing.T) {
 				ModelProvider: tt.provider,
 			}
 
-			client, err := NewClient(cfg)
+			client, err := NewClient(cfg, mockTS())
 
 			if tt.expectError {
 				if err == nil {
@@ -81,7 +81,7 @@ func TestNewClientErrorMessage(t *testing.T) {
 		ModelProvider: "unsupported-provider",
 	}
 
-	_, err := NewClient(cfg)
+	_, err := NewClient(cfg, mockTS())
 	if err == nil {
 		t.Fatal("NewClient() expected error, got nil")
 	}

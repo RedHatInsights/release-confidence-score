@@ -17,7 +17,7 @@ func TestNewGemini(t *testing.T) {
 		ModelID:       "gemini-pro",
 	}
 
-	client := NewGemini(cfg)
+	client := NewGemini(cfg, mockTS())
 
 	if client == nil {
 		t.Fatal("NewGemini() returned nil")
@@ -43,8 +43,8 @@ func TestGeminiAnalyze_Success(t *testing.T) {
 			t.Errorf("Expected Content-Type: application/json, got %s", r.Header.Get("Content-Type"))
 		}
 
-		if !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") {
-			t.Errorf("Expected Authorization header with Bearer token")
+		if r.Header.Get("Authorization") != "Bearer test-token" {
+			t.Errorf("Expected Authorization: Bearer test-token, got %s", r.Header.Get("Authorization"))
 		}
 
 		response := GeminiResponse{
@@ -71,13 +71,12 @@ func TestGeminiAnalyze_Success(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewGemini(cfg)
+	client := NewGemini(cfg, mockTS())
 	result, err := client.Analyze("test prompt")
 
 	if err != nil {
@@ -109,13 +108,12 @@ func TestGeminiAnalyze_EmptyResponse(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewGemini(cfg)
+	client := NewGemini(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {
@@ -137,13 +135,12 @@ func TestGeminiAnalyze_HTTPError(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewGemini(cfg)
+	client := NewGemini(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {
@@ -152,6 +149,26 @@ func TestGeminiAnalyze_HTTPError(t *testing.T) {
 
 	if !strings.Contains(err.Error(), "API error 502") {
 		t.Errorf("Analyze() error = %q, want error containing 'API error 502'", err.Error())
+	}
+}
+
+func TestGeminiAnalyze_TokenError(t *testing.T) {
+	cfg := &config.Config{
+		ModelAPI:               "http://unused",
+		ModelID:                "gemini-test",
+		ModelTimeoutSeconds:    30,
+		ModelMaxResponseTokens: 1000,
+		SystemPromptVersion:    "v1",
+	}
+
+	client := NewGemini(cfg, &errorTokenSource{})
+	_, err := client.Analyze("test prompt")
+
+	if err == nil {
+		t.Fatal("Analyze() expected error for token failure, got nil")
+	}
+	if !strings.Contains(err.Error(), "authentication token") {
+		t.Errorf("Analyze() error = %q, want error containing 'authentication token'", err.Error())
 	}
 }
 
@@ -165,13 +182,12 @@ func TestGeminiAnalyze_InvalidJSON(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewGemini(cfg)
+	client := NewGemini(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {
@@ -193,13 +209,12 @@ func TestGeminiAnalyze_ContextWindowError(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-		ModelUserKey:           "test-key",
-		ModelTimeoutSeconds:    30,
+				ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
 
-	client := NewGemini(cfg)
+	client := NewGemini(cfg, mockTS())
 	_, err := client.Analyze("test prompt")
 
 	if err == nil {

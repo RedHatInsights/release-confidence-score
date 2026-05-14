@@ -7,12 +7,12 @@ import (
 
 func TestLoad_ValidConfiguration(t *testing.T) {
 	// Set up valid environment
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_GITLAB_BASE_URL", "https://gitlab.example.com")
 	t.Setenv("RCS_GITLAB_TOKEN", "gitlab-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 
 	cfg, err := Load(false)
 	if err != nil {
@@ -36,10 +36,10 @@ func TestLoad_ValidConfiguration(t *testing.T) {
 
 func TestLoad_WithDefaults(t *testing.T) {
 	// Set only required fields
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 
 	cfg, err := Load(false)
 	if err != nil {
@@ -50,8 +50,8 @@ func TestLoad_WithDefaults(t *testing.T) {
 	if cfg.ModelProvider != "claude" {
 		t.Errorf("ModelProvider = %v, expected claude (default)", cfg.ModelProvider)
 	}
-	if cfg.ModelMaxResponseTokens != 2000 {
-		t.Errorf("ModelMaxResponseTokens = %v, expected 2000 (default)", cfg.ModelMaxResponseTokens)
+	if cfg.ModelMaxResponseTokens != 4096 {
+		t.Errorf("ModelMaxResponseTokens = %v, expected 4096 (default)", cfg.ModelMaxResponseTokens)
 	}
 	if cfg.ModelTimeoutSeconds != 120 {
 		t.Errorf("ModelTimeoutSeconds = %v, expected 120 (default)", cfg.ModelTimeoutSeconds)
@@ -73,10 +73,54 @@ func TestLoad_WithDefaults(t *testing.T) {
 	}
 }
 
+func TestLoad_MissingGoogleSAKey(t *testing.T) {
+	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
+	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
+	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
+
+	_, err := Load(false)
+	if err == nil {
+		t.Fatal("Expected error for missing GOOGLE_SA_KEY_B64, got none")
+	}
+	if err.Error() != "GOOGLE_SA_KEY_B64 environment variable is required" {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+func TestLoad_InvalidBase64GoogleSAKey(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "not-valid-base64!!!")
+	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
+	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
+	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
+
+	_, err := Load(false)
+	if err == nil {
+		t.Fatal("Expected error for invalid base64 GOOGLE_SA_KEY_B64, got none")
+	}
+	if err.Error() != "GOOGLE_SA_KEY_B64 contains invalid base64 encoding" {
+		t.Errorf("Unexpected error message: %v", err)
+	}
+}
+
+func TestLoad_DecodesGCPServiceAccountKey(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
+	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
+	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
+
+	cfg, err := Load(false)
+	if err != nil {
+		t.Fatalf("Expected no error, got: %v", err)
+	}
+	if string(cfg.GCPServiceAccountKey) != "test" {
+		t.Errorf("GCPServiceAccountKey = %q, expected %q", string(cfg.GCPServiceAccountKey), "test")
+	}
+}
+
 func TestLoad_MissingModelAPI(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 
 	_, err := Load(false)
 	if err == nil {
@@ -88,9 +132,9 @@ func TestLoad_MissingModelAPI(t *testing.T) {
 }
 
 func TestLoad_MissingModelID(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 
 	_, err := Load(false)
 	if err == nil {
@@ -101,24 +145,10 @@ func TestLoad_MissingModelID(t *testing.T) {
 	}
 }
 
-func TestLoad_MissingModelUserKey(t *testing.T) {
-	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
-	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
-	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-
-	_, err := Load(false)
-	if err == nil {
-		t.Fatal("Expected error for missing USER_KEY, got none")
-	}
-	if err.Error() != "RCS_CLAUDE_USER_KEY environment variable is required" {
-		t.Errorf("Unexpected error message: %v", err)
-	}
-}
-
 func TestLoad_MissingBothGitTokens(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 
 	_, err := Load(false)
 	if err == nil {
@@ -130,10 +160,10 @@ func TestLoad_MissingBothGitTokens(t *testing.T) {
 }
 
 func TestLoad_GitLabTokenWithoutBaseURL(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITLAB_TOKEN", "gitlab-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 
 	_, err := Load(false)
 	if err == nil {
@@ -145,10 +175,10 @@ func TestLoad_GitLabTokenWithoutBaseURL(t *testing.T) {
 }
 
 func TestLoad_AppInterfaceModeWithoutGitLabToken(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 
 	_, err := Load(true) // app-interface mode
 	if err == nil {
@@ -160,10 +190,10 @@ func TestLoad_AppInterfaceModeWithoutGitLabToken(t *testing.T) {
 }
 
 func TestLoad_InvalidScoreThresholds(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_SCORE_THRESHOLD_AUTO_DEPLOY", "50")
 	t.Setenv("RCS_SCORE_THRESHOLD_REVIEW_REQUIRED", "70")
 
@@ -181,7 +211,6 @@ func TestLoad_InvalidMaxResponseTokens(t *testing.T) {
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_MODEL_MAX_RESPONSE_TOKENS", "not-a-number")
 
 	_, err := Load(false)
@@ -197,7 +226,6 @@ func TestLoad_InvalidTimeoutSeconds(t *testing.T) {
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_MODEL_TIMEOUT_SECONDS", "invalid")
 
 	_, err := Load(false)
@@ -213,7 +241,6 @@ func TestLoad_OutOfRangeScoreThreshold(t *testing.T) {
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_SCORE_THRESHOLD_AUTO_DEPLOY", "150")
 
 	_, err := Load(false)
@@ -229,7 +256,6 @@ func TestLoad_InvalidGitLabSkipSSL(t *testing.T) {
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_GITLAB_SKIP_SSL_VERIFY", "not-a-bool")
 
 	_, err := Load(false)
@@ -245,7 +271,6 @@ func TestLoad_InvalidModelSkipSSL(t *testing.T) {
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_MODEL_SKIP_SSL_VERIFY", "yes")
 
 	_, err := Load(false)
@@ -258,10 +283,10 @@ func TestLoad_InvalidModelSkipSSL(t *testing.T) {
 }
 
 func TestLoad_ValidBooleanValues(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_GITLAB_SKIP_SSL_VERIFY", "true")
 	t.Setenv("RCS_MODEL_SKIP_SSL_VERIFY", "1")
 
@@ -279,11 +304,11 @@ func TestLoad_ValidBooleanValues(t *testing.T) {
 }
 
 func TestLoad_DifferentModelProvider(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_MODEL_PROVIDER", "gemini")
 	t.Setenv("RCS_GEMINI_MODEL_API", "https://gemini.example.com")
 	t.Setenv("RCS_GEMINI_MODEL_ID", "gemini-model")
-	t.Setenv("RCS_GEMINI_USER_KEY", "gemini-key")
 
 	cfg, err := Load(false)
 	if err != nil {
@@ -445,10 +470,10 @@ func TestParseIntEnvOrDefault(t *testing.T) {
 }
 
 func TestLoad_InvalidLogLevel(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_LOG_LEVEL", "invalid")
 
 	_, err := Load(false)
@@ -461,10 +486,10 @@ func TestLoad_InvalidLogLevel(t *testing.T) {
 }
 
 func TestLoad_InvalidLogFormat(t *testing.T) {
+	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 	t.Setenv("RCS_LOG_FORMAT", "xml")
 
 	_, err := Load(false)
@@ -482,10 +507,10 @@ func TestLoad_ValidLogLevels(t *testing.T) {
 
 	for _, level := range testLevels {
 		t.Run(level, func(t *testing.T) {
+			t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 			t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 			t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 			t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-			t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 			t.Setenv("RCS_LOG_LEVEL", level)
 
 			_, err := Load(false)
@@ -502,10 +527,10 @@ func TestLoad_ValidLogFormats(t *testing.T) {
 
 	for _, format := range testFormats {
 		t.Run(format, func(t *testing.T) {
+			t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
 			t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 			t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 			t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
-			t.Setenv("RCS_CLAUDE_USER_KEY", "api-key")
 			t.Setenv("RCS_LOG_FORMAT", format)
 
 			_, err := Load(false)

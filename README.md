@@ -27,7 +27,7 @@ See [DEMO_CONFIDENCE_REPORT.md](docs/DEMO_CONFIDENCE_REPORT.md) for an example o
 
 ## Prerequisites
 
-- API access to one of the supported AI providers (Claude or Gemini).
+- API access to one of the supported AI providers (Claude or Gemini) via GCP Vertex AI.
 - GitHub and GitLab personal access tokens.
 
 ## Quick Start
@@ -88,7 +88,7 @@ RCS supports two operation modes:
    export RCS_MODEL_PROVIDER="claude" # or gemini
    export RCS_CLAUDE_MODEL_API="your_claude_api_endpoint"
    export RCS_CLAUDE_MODEL_ID="claude-sonnet-4@20250514"
-   export RCS_CLAUDE_USER_KEY="your_claude_api_key"
+   export GOOGLE_SA_KEY_B64="$(base64 < your-service-account.json)"
    ```
 
 3. **Build the application**
@@ -130,18 +130,18 @@ RCS supports two operation modes:
 - `RCS_GITLAB_BASE_URL`: GitLab instance URL.
 - `RCS_GITLAB_TOKEN`: GitLab personal access token.
 
+**GCP Authentication:**
+- `GOOGLE_SA_KEY_B64`: Base64-encoded GCP service account JSON key. Used for OAuth2 authentication with Vertex AI.
+
 **Provider-Specific Configuration:**
 
 For Claude (default):
 - `RCS_CLAUDE_MODEL_API`: Claude API endpoint.
 - `RCS_CLAUDE_MODEL_ID`: Model identifier (e.g., `claude-sonnet-4@20250514`).
-- `RCS_CLAUDE_USER_KEY`: Authentication key.
 
 For Gemini:
 - `RCS_GEMINI_MODEL_API`: Gemini API endpoint.
 - `RCS_GEMINI_MODEL_ID`: Model identifier (e.g., `gemini-2.5-pro`).
-- `RCS_GEMINI_USER_KEY`: Authentication key.
-
 ### Optional Environment Variables
 
 **AI Provider Selection:**
@@ -149,7 +149,7 @@ For Gemini:
 
 **Model Configuration:**
 - `RCS_MODEL_SKIP_SSL_VERIFY`: Skip SSL verification for AI provider (default: false).
-- `RCS_MODEL_MAX_RESPONSE_TOKENS`: Maximum tokens in AI response (default: 2000).
+- `RCS_MODEL_MAX_RESPONSE_TOKENS`: Maximum tokens in AI response (default: 4096).
 - `RCS_MODEL_TIMEOUT_SECONDS`: Request timeout in seconds (default: 120).
 - `RCS_SYSTEM_PROMPT_VERSION`: System prompt version to use (default: v1).
 

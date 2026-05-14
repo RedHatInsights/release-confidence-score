@@ -19,6 +19,7 @@ import (
 	"release-confidence-score/internal/llm/truncation"
 	"release-confidence-score/internal/report"
 
+	"golang.org/x/oauth2/google"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -44,7 +45,15 @@ func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 		return nil, fmt.Errorf("failed to create GitLab client: %w", err)
 	}
 
-	llmClient, err := providers.NewClient(cfg)
+	creds, err := google.CredentialsFromJSONWithParams(context.Background(), cfg.GCPServiceAccountKey, google.CredentialsParams{
+		Scopes: []string{"https://www.googleapis.com/auth/cloud-platform"},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse GCP service account credentials")
+	}
+	ts := creds.TokenSource
+
+	llmClient, err := providers.NewClient(cfg, ts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create LLM client: %w", err)
 	}
