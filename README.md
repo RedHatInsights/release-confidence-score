@@ -27,7 +27,7 @@ See [DEMO_CONFIDENCE_REPORT.md](docs/DEMO_CONFIDENCE_REPORT.md) for an example o
 
 ## Prerequisites
 
-- API access to one of the supported AI providers (Claude, Gemini or Llama).
+- API access to one of the supported AI providers (Claude or Gemini).
 - GitHub and GitLab personal access tokens.
 
 ## Quick Start
@@ -85,7 +85,7 @@ RCS supports two operation modes:
    export RCS_GITHUB_TOKEN="your_github_token"
    export RCS_GITLAB_BASE_URL="https://gitlab.cee.redhat.com/"
    export RCS_GITLAB_TOKEN="your_gitlab_token"
-   export RCS_MODEL_PROVIDER="claude" # or gemini, llama
+   export RCS_MODEL_PROVIDER="claude" # or gemini
    export RCS_CLAUDE_MODEL_API="your_claude_api_endpoint"
    export RCS_CLAUDE_MODEL_ID="claude-sonnet-4@20250514"
    export RCS_CLAUDE_USER_KEY="your_claude_api_key"
@@ -142,15 +142,10 @@ For Gemini:
 - `RCS_GEMINI_MODEL_ID`: Model identifier (e.g., `gemini-2.5-pro`).
 - `RCS_GEMINI_USER_KEY`: Authentication key.
 
-For Llama:
-- `RCS_LLAMA_MODEL_API`: Llama API endpoint.
-- `RCS_LLAMA_MODEL_ID`: Model identifier (e.g., `RedHatAI/Llama-3.3-70B-Instruct-FP8-dynamic`).
-- `RCS_LLAMA_USER_KEY`: Authentication key.
-
 ### Optional Environment Variables
 
 **AI Provider Selection:**
-- `RCS_MODEL_PROVIDER`: Choose `claude` (default), `gemini`, or `llama`.
+- `RCS_MODEL_PROVIDER`: Choose `claude` (default) or `gemini`.
 
 **Model Configuration:**
 - `RCS_MODEL_SKIP_SSL_VERIFY`: Skip SSL verification for AI provider (default: false).
