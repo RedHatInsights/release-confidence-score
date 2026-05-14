@@ -31,7 +31,7 @@ func TestIsContextWindowError(t *testing.T) {
 			want:       true,
 		},
 		{
-			name:       "Llama token limit error",
+			name:       "Token limit error",
 			statusCode: http.StatusBadRequest,
 			body:       `{"error": "token limit exceeded"}`,
 			want:       true,

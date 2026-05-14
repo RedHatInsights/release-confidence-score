@@ -15,9 +15,6 @@ func NewClient(cfg *config.Config) (LLMClient, error) {
 	case "gemini":
 		return NewGemini(cfg), nil
 
-	case "llama":
-		return NewLlama(cfg), nil
-
 	default:
 		return nil, fmt.Errorf("unsupported model provider: %s", cfg.ModelProvider)
 	}
