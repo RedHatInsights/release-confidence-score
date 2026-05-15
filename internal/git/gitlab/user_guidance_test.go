@@ -6,7 +6,7 @@ import (
 
 	"release-confidence-score/internal/git/types"
 
-	"gitlab.com/gitlab-org/api/client-go"
+	"gitlab.com/gitlab-org/api/client-go/v2"
 )
 
 func TestIsValidNote(t *testing.T) {

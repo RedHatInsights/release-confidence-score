@@ -10,7 +10,7 @@ import (
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 
-	gitlab "gitlab.com/gitlab-org/api/client-go"
+	gitlab "gitlab.com/gitlab-org/api/client-go/v2"
 	"golang.org/x/sync/errgroup"
 )
 
