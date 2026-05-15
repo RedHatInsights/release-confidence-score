@@ -48,11 +48,13 @@ func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 	creds, err := google.CredentialsFromJSONWithTypeAndParams(context.Background(), cfg.GCPServiceAccountKey, google.ServiceAccount, google.CredentialsParams{
 		Scopes: []string{"https://www.googleapis.com/auth/cloud-platform"},
 	})
-	clear(cfg.GCPServiceAccountKey)
-	cfg.GCPServiceAccountKey = nil
 	if err != nil {
+		clear(cfg.GCPServiceAccountKey)
+		cfg.GCPServiceAccountKey = nil
 		return nil, fmt.Errorf("failed to parse GCP service account credentials")
 	}
+	clear(cfg.GCPServiceAccountKey)
+	cfg.GCPServiceAccountKey = nil
 	ts := creds.TokenSource
 
 	llmClient, err := providers.NewClient(cfg, ts)

@@ -142,6 +142,7 @@ For Claude (default):
 For Gemini:
 - `RCS_GEMINI_MODEL_API`: Gemini API endpoint.
 - `RCS_GEMINI_MODEL_ID`: Model identifier (e.g., `gemini-2.5-pro`).
+
 ### Optional Environment Variables
 
 **AI Provider Selection:**
