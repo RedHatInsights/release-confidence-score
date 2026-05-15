@@ -15,7 +15,7 @@ import (
 
 	"golang.org/x/sync/errgroup"
 
-	gitlabapi "gitlab.com/gitlab-org/api/client-go"
+	gitlabapi "gitlab.com/gitlab-org/api/client-go/v2"
 )
 
 // gitlabCompareRegex matches GitLab compare URLs and extracts components
