@@ -3,6 +3,8 @@ services:
     build: .
     env_file: .env
     environment:
+      # GCP service account (base64-encoded JSON)
+      - RCS_GOOGLE_SA_KEY_B64
       # GitHub configuration
       - RCS_GITHUB_TOKEN
       # GitLab configuration
@@ -14,8 +16,6 @@ services:
       - RCS_LOG_LEVEL
       # Model selection (claude or gemini)
       - RCS_MODEL_PROVIDER
-      # GCP service account (base64-encoded JSON)
-      - GOOGLE_SA_KEY_B64
       # Claude configuration
       - RCS_CLAUDE_MODEL_API
       - RCS_CLAUDE_MODEL_ID

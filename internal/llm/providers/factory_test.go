@@ -27,6 +27,11 @@ func TestNewClient(t *testing.T) {
 			expectType:  "*providers.GeminiClient",
 		},
 		{
+			name:        "removed llama provider",
+			provider:    "llama",
+			expectError: true,
+		},
+		{
 			name:        "unsupported provider",
 			provider:    "openai",
 			expectError: true,

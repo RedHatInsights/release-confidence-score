@@ -71,7 +71,7 @@ func TestGeminiAnalyze_Success(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-				ModelTimeoutSeconds:    30,
+		ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
@@ -108,7 +108,7 @@ func TestGeminiAnalyze_EmptyResponse(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-				ModelTimeoutSeconds:    30,
+		ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
@@ -135,7 +135,7 @@ func TestGeminiAnalyze_HTTPError(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-				ModelTimeoutSeconds:    30,
+		ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
@@ -182,7 +182,7 @@ func TestGeminiAnalyze_InvalidJSON(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-				ModelTimeoutSeconds:    30,
+		ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}
@@ -209,7 +209,7 @@ func TestGeminiAnalyze_ContextWindowError(t *testing.T) {
 	cfg := &config.Config{
 		ModelAPI:               server.URL,
 		ModelID:                "gemini-test",
-				ModelTimeoutSeconds:    30,
+		ModelTimeoutSeconds:    30,
 		ModelMaxResponseTokens: 1000,
 		SystemPromptVersion:    "v1",
 	}

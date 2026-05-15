@@ -167,8 +167,7 @@ func TestExtractUserGuidance(t *testing.T) {
 	t.Setenv("RCS_GITLAB_TOKEN", "test-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "test-model")
-	t.Setenv("RCS_CLAUDE_USER_KEY", "test-key")
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdC1rZXk=")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdC1rZXk=")
 	cfg, err := config.Load(true) // app-interface mode
 	if err != nil {
 		t.Fatalf("Failed to load config: %v", err)

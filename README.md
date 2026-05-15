@@ -88,7 +88,7 @@ RCS supports two operation modes:
    export RCS_MODEL_PROVIDER="claude" # or gemini
    export RCS_CLAUDE_MODEL_API="your_claude_api_endpoint"
    export RCS_CLAUDE_MODEL_ID="claude-sonnet-4@20250514"
-   export GOOGLE_SA_KEY_B64="$(base64 < your-service-account.json)"
+   export RCS_GOOGLE_SA_KEY_B64="$(base64 < your-service-account.json)"
    ```
 
 3. **Build the application**
@@ -131,7 +131,7 @@ RCS supports two operation modes:
 - `RCS_GITLAB_TOKEN`: GitLab personal access token.
 
 **GCP Authentication:**
-- `GOOGLE_SA_KEY_B64`: Base64-encoded GCP service account JSON key. Used for OAuth2 authentication with Vertex AI.
+- `RCS_GOOGLE_SA_KEY_B64`: Base64-encoded GCP service account JSON key. Used for OAuth2 authentication with Vertex AI.
 
 **Provider-Specific Configuration:**
 

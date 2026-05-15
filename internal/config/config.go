@@ -16,8 +16,8 @@ var (
 )
 
 type Config struct {
-	GCPServiceAccountKey   []byte
-	GitHubToken            string
+	GCPServiceAccountKey []byte // cleared after credential initialization
+	GitHubToken          string
 	GitLabBaseURL          string
 	GitLabSkipSSLVerify    bool
 	GitLabToken            string
@@ -209,13 +209,13 @@ func validateConfig(cfg *Config, isAppInterfaceMode bool, modelProviderPrefix st
 }
 
 func parseGCPServiceAccountKey() ([]byte, error) {
-	raw := os.Getenv("GOOGLE_SA_KEY_B64")
+	raw := os.Getenv("RCS_GOOGLE_SA_KEY_B64")
 	if raw == "" {
-		return nil, fmt.Errorf("GOOGLE_SA_KEY_B64 environment variable is required")
+		return nil, fmt.Errorf("RCS_GOOGLE_SA_KEY_B64 environment variable is required")
 	}
 	decoded, err := base64.StdEncoding.DecodeString(strings.TrimSpace(raw))
 	if err != nil {
-		return nil, fmt.Errorf("GOOGLE_SA_KEY_B64 contains invalid base64 encoding")
+		return nil, fmt.Errorf("RCS_GOOGLE_SA_KEY_B64 contains invalid base64 encoding")
 	}
 	return decoded, nil
 }

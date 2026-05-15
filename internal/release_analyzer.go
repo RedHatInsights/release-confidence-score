@@ -45,9 +45,11 @@ func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 		return nil, fmt.Errorf("failed to create GitLab client: %w", err)
 	}
 
-	creds, err := google.CredentialsFromJSONWithParams(context.Background(), cfg.GCPServiceAccountKey, google.CredentialsParams{
+	creds, err := google.CredentialsFromJSONWithTypeAndParams(context.Background(), cfg.GCPServiceAccountKey, google.ServiceAccount, google.CredentialsParams{
 		Scopes: []string{"https://www.googleapis.com/auth/cloud-platform"},
 	})
+	clear(cfg.GCPServiceAccountKey)
+	cfg.GCPServiceAccountKey = nil
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse GCP service account credentials")
 	}

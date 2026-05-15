@@ -7,7 +7,7 @@ import (
 
 func TestLoad_ValidConfiguration(t *testing.T) {
 	// Set up valid environment
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_GITLAB_BASE_URL", "https://gitlab.example.com")
 	t.Setenv("RCS_GITLAB_TOKEN", "gitlab-token")
@@ -36,7 +36,7 @@ func TestLoad_ValidConfiguration(t *testing.T) {
 
 func TestLoad_WithDefaults(t *testing.T) {
 	// Set only required fields
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -80,30 +80,30 @@ func TestLoad_MissingGoogleSAKey(t *testing.T) {
 
 	_, err := Load(false)
 	if err == nil {
-		t.Fatal("Expected error for missing GOOGLE_SA_KEY_B64, got none")
+		t.Fatal("Expected error for missing RCS_GOOGLE_SA_KEY_B64, got none")
 	}
-	if err.Error() != "GOOGLE_SA_KEY_B64 environment variable is required" {
+	if err.Error() != "RCS_GOOGLE_SA_KEY_B64 environment variable is required" {
 		t.Errorf("Unexpected error message: %v", err)
 	}
 }
 
 func TestLoad_InvalidBase64GoogleSAKey(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "not-valid-base64!!!")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "not-valid-base64!!!")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
 
 	_, err := Load(false)
 	if err == nil {
-		t.Fatal("Expected error for invalid base64 GOOGLE_SA_KEY_B64, got none")
+		t.Fatal("Expected error for invalid base64 RCS_GOOGLE_SA_KEY_B64, got none")
 	}
-	if err.Error() != "GOOGLE_SA_KEY_B64 contains invalid base64 encoding" {
+	if err.Error() != "RCS_GOOGLE_SA_KEY_B64 contains invalid base64 encoding" {
 		t.Errorf("Unexpected error message: %v", err)
 	}
 }
 
 func TestLoad_DecodesGCPServiceAccountKey(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -118,7 +118,7 @@ func TestLoad_DecodesGCPServiceAccountKey(t *testing.T) {
 }
 
 func TestLoad_MissingModelAPI(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
 
@@ -132,7 +132,7 @@ func TestLoad_MissingModelAPI(t *testing.T) {
 }
 
 func TestLoad_MissingModelID(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 
@@ -146,7 +146,7 @@ func TestLoad_MissingModelID(t *testing.T) {
 }
 
 func TestLoad_MissingBothGitTokens(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
 
@@ -160,7 +160,7 @@ func TestLoad_MissingBothGitTokens(t *testing.T) {
 }
 
 func TestLoad_GitLabTokenWithoutBaseURL(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITLAB_TOKEN", "gitlab-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -175,7 +175,7 @@ func TestLoad_GitLabTokenWithoutBaseURL(t *testing.T) {
 }
 
 func TestLoad_AppInterfaceModeWithoutGitLabToken(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -190,7 +190,7 @@ func TestLoad_AppInterfaceModeWithoutGitLabToken(t *testing.T) {
 }
 
 func TestLoad_InvalidScoreThresholds(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -283,7 +283,7 @@ func TestLoad_InvalidModelSkipSSL(t *testing.T) {
 }
 
 func TestLoad_ValidBooleanValues(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -304,7 +304,7 @@ func TestLoad_ValidBooleanValues(t *testing.T) {
 }
 
 func TestLoad_DifferentModelProvider(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_MODEL_PROVIDER", "gemini")
 	t.Setenv("RCS_GEMINI_MODEL_API", "https://gemini.example.com")
@@ -470,7 +470,7 @@ func TestParseIntEnvOrDefault(t *testing.T) {
 }
 
 func TestLoad_InvalidLogLevel(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -486,7 +486,7 @@ func TestLoad_InvalidLogLevel(t *testing.T) {
 }
 
 func TestLoad_InvalidLogFormat(t *testing.T) {
-	t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+	t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 	t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 	t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 	t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -507,7 +507,7 @@ func TestLoad_ValidLogLevels(t *testing.T) {
 
 	for _, level := range testLevels {
 		t.Run(level, func(t *testing.T) {
-			t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+			t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 			t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 			t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 			t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
@@ -527,7 +527,7 @@ func TestLoad_ValidLogFormats(t *testing.T) {
 
 	for _, format := range testFormats {
 		t.Run(format, func(t *testing.T) {
-			t.Setenv("GOOGLE_SA_KEY_B64", "dGVzdA==")
+			t.Setenv("RCS_GOOGLE_SA_KEY_B64", "dGVzdA==")
 			t.Setenv("RCS_GITHUB_TOKEN", "github-token")
 			t.Setenv("RCS_CLAUDE_MODEL_API", "https://api.example.com")
 			t.Setenv("RCS_CLAUDE_MODEL_ID", "claude-model")
