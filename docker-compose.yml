@@ -7,6 +7,7 @@ services:
       - RCS_GOOGLE_SA_KEY_B64
       # GitHub configuration
       - RCS_GITHUB_TOKEN
+      - RCS_GITHUB_USE_GRAPHQL
       # GitLab configuration
       - RCS_GITLAB_BASE_URL
       - RCS_GITLAB_SKIP_SSL_VERIFY

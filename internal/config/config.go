@@ -16,8 +16,9 @@ var (
 )
 
 type Config struct {
-	GCPServiceAccountKey []byte // cleared after credential initialization
-	GitHubToken          string
+	GCPServiceAccountKey   []byte // cleared after credential initialization
+	GitHubToken            string
+	GitHubUseGraphQL       bool
 	GitLabBaseURL          string
 	GitLabSkipSSLVerify    bool
 	GitLabToken            string
@@ -43,6 +44,10 @@ func Load(isAppInterfaceMode bool) (*Config, error) {
 
 	// Parse Git platform configuration
 	gitHubToken := os.Getenv("RCS_GITHUB_TOKEN")
+	gitHubUseGraphQL, err := parseBoolEnvOrDefault("RCS_GITHUB_USE_GRAPHQL", false)
+	if err != nil {
+		return nil, err
+	}
 	gitLabBaseURL := os.Getenv("RCS_GITLAB_BASE_URL")
 	gitLabToken := os.Getenv("RCS_GITLAB_TOKEN")
 
@@ -98,6 +103,7 @@ func Load(isAppInterfaceMode bool) (*Config, error) {
 	cfg := &Config{
 		GCPServiceAccountKey:   gcpSAKey,
 		GitHubToken:            gitHubToken,
+		GitHubUseGraphQL:       gitHubUseGraphQL,
 		GitLabBaseURL:          gitLabBaseURL,
 		GitLabSkipSSLVerify:    gitLabSkipSSL,
 		GitLabToken:            gitLabToken,
