@@ -17,20 +17,6 @@ Detailed domain-specific rules are maintained in separate guideline files. Read 
 | [docs/testing-guidelines.md](docs/testing-guidelines.md) | Table-driven tests, mocking, assertion style, test parity |
 | [docs/integration-guidelines.md](docs/integration-guidelines.md) | GitHub/GitLab/GCP integration, shared logic, app-interface |
 
-### Path-to-Guideline Mapping
-
-When working in a directory, read the guidelines listed for it:
-
-| Path | Applicable guidelines |
-|---|---|
-| `internal/git/github/**` | integration, api-contracts, testing |
-| `internal/git/gitlab/**` | integration, api-contracts, testing |
-| `internal/git/shared/**` | integration, api-contracts |
-| `internal/llm/**` | security, api-contracts, error-handling, performance |
-| `internal/config/**` | security, error-handling |
-| `internal/app_interface/**` | integration, security |
-| `.github/**`, `.tekton/**` | security |
-
 ## Code Quality Principles
 
 - Write the simplest code that solves the problem. Avoid abstractions until clearly needed (rule of three).
