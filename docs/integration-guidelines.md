@@ -79,7 +79,9 @@ All HTTP clients are created through `internal/http/httpclient.go`. Rules:
 - Timeout: 30 seconds (hardcoded, separate from model timeout).
 - GitLab URLs get `PRIVATE-TOKEN` header and respect `GitLabSkipSSLVerify`.
 - GitLab detection: hostname is `gitlab.com`, `www.gitlab.com`, or starts with `gitlab.`.
-- Blob-to-raw URL conversion: replaces `/blob/` with `/raw/` in the path.
+
+Blob-to-raw URL conversion (`shared/documentation_fetcher.go`):
+- `fetchAdditionalDocContent` converts blob URLs to raw URLs via `strings.Replace(path, "/blob/", "/raw/", 1)` before passing them to `fetchExternalURL` -- works for both GitHub and GitLab URL formats.
 
 ## App-Interface Mode (CI/CD Pipeline)
 

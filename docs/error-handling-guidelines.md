@@ -62,6 +62,8 @@ if llmerrors.IsContextWindowError(resp.StatusCode, body) {
 return "", fmt.Errorf("API error %d: %s", resp.StatusCode, string(body))
 ```
 
+Note: the full response body is included in error messages. This is acceptable because LLM API error responses are short JSON payloads, not large documents. If adding error handling for endpoints that may return large bodies, truncate before including in errors.
+
 **Consumption via type assertion (not `errors.As`):**
 ```go
 contextErr, ok := err.(*llmerrors.ContextWindowError)
@@ -194,10 +196,4 @@ When adding error handling to one platform, add the equivalent to the other.
 
 ## CLI Validation Errors
 
-CLI validation errors include actionable help text:
-
-```go
-return fmt.Errorf("standalone mode requires compare URLs\n\nTry:\n  rcs --compare-links <url1>,<url2>\n\nOr run 'rcs --help' for more information")
-```
-
-This pattern applies only to user-facing CLI argument errors, not to internal errors.
+CLI validation errors include actionable help text (e.g., `"standalone mode requires compare URLs\n\nTry:\n  rcs --compare-links ..."`). This pattern applies only to user-facing CLI argument errors, not to internal errors.

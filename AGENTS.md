@@ -31,42 +31,6 @@ When working in a directory, read the guidelines listed for it:
 | `internal/app_interface/**` | integration, security |
 | `.github/**`, `.tekton/**` | security |
 
-## Code Quality Principles
-
-### Simplicity First
-- Write the simplest code that solves the problem.
-- Avoid abstractions until they are clearly needed (rule of three).
-- No helper functions for one-time operations.
-- No wrapper functions that just call another function.
-- Inline short logic instead of extracting unnecessary functions.
-
-### No Redundancy
-- Remove dead code immediately.
-- Do not store data that can be computed or already exists.
-- Do not rebuild values when you have them (e.g., do not reconstruct URLs from parts when you have the original URL).
-- Check if a function/variable is actually used before keeping it.
-- If data flows IN somewhere, do not create a method to pull it back OUT.
-
-### Avoid Over-Engineering
-- No premature optimization.
-- No "just in case" parameters or configurations.
-- No backward compatibility shims unless explicitly requested.
-- Do not add error handling for impossible scenarios.
-- Trust internal code; only validate at system boundaries.
-
-### Consistency
-- Use consistent naming across similar files (e.g., GitHub and GitLab implementations).
-- Match existing patterns in the codebase.
-- Same error message format across similar functions.
-- Same variable naming conventions.
-
-### Before Writing Code
-- Read existing code first to understand patterns.
-- Question whether the feature/change is needed.
-- Ask: "Is there a simpler way?"
-- Ask: "Does this data already exist somewhere?"
-- Ask: "Can I reuse existing code?"
-
 ## GitHub/GitLab Parity
 
 The `internal/git/github/` and `internal/git/gitlab/` packages implement the same `GitProvider` interface. When modifying one:
@@ -78,31 +42,6 @@ The `internal/git/github/` and `internal/git/gitlab/` packages implement the sam
 - Never add platform-specific fields to shared types in `internal/git/types/`.
 - Platform-agnostic logic belongs in `internal/git/shared/`, not in the platform packages.
 - When in doubt about whether a change should be mirrored, ask the user before proceeding.
-
-## Go Conventions
-
-### Naming
-- Use descriptive but concise names.
-- Match receiver variable to type (e.g., `d` for `documentationSource`).
-- Private functions/types use camelCase.
-- Only export what is needed.
-
-### Error Handling
-- Wrap errors with context: `fmt.Errorf("failed to X: %w", err)`.
-- Do not log AND return errors (pick one).
-- Fatal errors should return, not just log.
-- See [docs/error-handling-guidelines.md](docs/error-handling-guidelines.md) for detailed wrapping format, retry logic, and the warn-and-continue pattern.
-
-### Interfaces
-- Keep interfaces minimal (1-3 methods).
-- Name interfaces after what they do, not what they are.
-- Only create interfaces when you need abstraction.
-
-### Testing
-- Test behavior, not implementation.
-- Use table-driven tests for multiple cases.
-- Mock at boundaries (SDK clients, HTTP).
-- See [docs/testing-guidelines.md](docs/testing-guidelines.md) for the complete testing conventions.
 
 ## Architecture
 
@@ -203,16 +142,3 @@ The codebase has minimal direct dependencies (see `go.mod`):
 
 No web frameworks, no assertion libraries, no code generation tools, no mocking libraries.
 
-## Review Checklist
-
-Before submitting code, verify:
-
-- [ ] No unused imports, variables, or functions
-- [ ] No duplicate logic
-- [ ] No unnecessary helper functions
-- [ ] Consistent with existing codebase patterns
-- [ ] Error messages are clear and consistent
-- [ ] No over-engineered abstractions
-- [ ] Comments explain "why", not "what"
-- [ ] If modifying GitHub or GitLab code, the equivalent change is applied to the other platform (or confirmed as not applicable)
-- [ ] Relevant guideline files have been read for the directories being modified
