@@ -1,4 +1,6 @@
 /.claude/
+!/.claude/rules/
+!/.claude/rules/**
 /.idea/
 /.env
 /rcs

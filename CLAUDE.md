@@ -1,78 +1,58 @@
-# Claude Code Guidelines
+# Claude Code Instructions
 
-## Code Quality Principles
+@AGENTS.md
 
-### Simplicity First
-- Write the simplest code that solves the problem
-- Avoid abstractions until they're clearly needed (rule of three)
-- No helper functions for one-time operations
-- No wrapper functions that just call another function
-- Inline short logic instead of extracting unnecessary functions
+## Build and Test Commands
 
-### No Redundancy
-- Remove dead code immediately
-- Don't store data that can be computed or already exists
-- Don't rebuild values when you have them (e.g., don't reconstruct URLs from parts when you have the original URL)
-- Check if a function/variable is actually used before keeping it
-- If data flows IN somewhere, don't create a method to pull it back OUT
+### Build
+```bash
+go build -v ./...
+```
 
-### Avoid Over-Engineering
-- No premature optimization
-- No "just in case" parameters or configurations
-- No backward compatibility shims unless explicitly requested
-- Don't add error handling for impossible scenarios
-- Trust internal code; only validate at system boundaries
+Or build the binary directly:
+```bash
+go build -o rcs .
+```
 
-### Consistency
-- Use consistent naming across similar files (e.g., GitHub and GitLab implementations)
-- Match existing patterns in the codebase
-- Same error message format across similar functions
-- Same variable naming conventions
+### Test
+```bash
+go test -v ./...
+```
 
-### GitHub/GitLab Parity
-The `git/github/` and `git/gitlab/` packages implement the same `GitProvider` interface. When modifying one:
-- Check if the same change applies to the other platform
-- Keep function signatures, error messages, and behavior consistent
-- If a fix applies to one platform, it likely applies to both (e.g., URL regex fixes)
-- When in doubt about whether a change should be mirrored, ask the user before proceeding
+### Docker Build
+```bash
+docker compose build
+```
 
-### Before Writing Code
-- Read existing code first to understand patterns
-- Question whether the feature/change is needed
-- Ask: "Is there a simpler way?"
-- Ask: "Does this data already exist somewhere?"
-- Ask: "Can I reuse existing code?"
+### Run Locally
+```bash
+# Copy and configure environment
+cp .env.example .env
+# Edit .env with credentials
 
-## Go-Specific Guidelines
+# Run with Docker
+docker compose run --rm rcs --compare-links "https://github.com/org/repo/compare/v1.0...v1.1"
 
-### Naming
-- Use descriptive but concise names
-- Match receiver variable to type (e.g., `d` for `documentationSource`)
-- Private functions/types use camelCase
-- Only export what's needed
+# Or run the binary directly (after setting environment variables)
+./rcs --compare-links "https://github.com/org/repo/compare/v1.0...v1.1"
+```
 
-### Error Handling
-- Wrap errors with context: `fmt.Errorf("failed to X: %w", err)`
-- Don't log AND return errors (pick one)
-- Fatal errors should return, not just log
+## Claude Code Behavior
 
-### Interfaces
-- Keep interfaces minimal (1-3 methods)
-- Name interfaces after what they do, not what they are
-- Only create interfaces when you need abstraction
+### Path-Specific Rules
+The `.claude/rules/` directory contains path-based rule imports that automatically load relevant guidelines:
+- `github-integration.md` - Loads integration, api-contracts, testing guidelines for `internal/git/github/**`
+- `gitlab-integration.md` - Loads integration, api-contracts, testing guidelines for `internal/git/gitlab/**`
+- `shared-git.md` - Loads integration, api-contracts guidelines for `internal/git/shared/**`
+- `llm.md` - Loads security, api-contracts, error-handling, performance guidelines for `internal/llm/**`
+- `config.md` - Loads security, error-handling guidelines for `internal/config/**`
+- `app-interface.md` - Loads integration, security guidelines for `internal/app_interface/**`
+- `ci-cd.md` - Loads security guidelines for `.github/**` and `.tekton/**`
 
-### Testing
-- Test behavior, not implementation
-- Use table-driven tests for multiple cases
-- Mock at boundaries (SDK clients, HTTP)
+These rules are automatically applied when you work in those directories.
 
-## Review Checklist
-
-Before submitting code, verify:
-- [ ] No unused imports, variables, or functions
-- [ ] No duplicate logic
-- [ ] No unnecessary helper functions
-- [ ] Consistent with existing codebase patterns
-- [ ] Error messages are clear and consistent
-- [ ] No over-engineered abstractions
-- [ ] Comments explain "why", not "what"
+### Environment Requirements
+- Go 1.25.0 or later
+- No pre-commit hooks configured
+- No linter configuration (follow Go standard formatting)
+- No vendoring (dependencies via `go mod download`)
