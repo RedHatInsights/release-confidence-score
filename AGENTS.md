@@ -31,6 +31,14 @@ When working in a directory, read the guidelines listed for it:
 | `internal/app_interface/**` | integration, security |
 | `.github/**`, `.tekton/**` | security |
 
+## Code Quality Principles
+
+- Write the simplest code that solves the problem. Avoid abstractions until clearly needed (rule of three).
+- Remove dead code immediately. Check if a function/variable is actually used before keeping it.
+- Do not store data that can be computed or already exists. Do not rebuild values when you have them (e.g., do not reconstruct URLs from parts when you have the original URL).
+- If data flows IN somewhere, do not create a method to pull it back OUT.
+- Trust internal code; only validate at system boundaries. Do not add error handling for impossible scenarios.
+
 ## GitHub/GitLab Parity
 
 The `internal/git/github/` and `internal/git/gitlab/` packages implement the same `GitProvider` interface. When modifying one:
