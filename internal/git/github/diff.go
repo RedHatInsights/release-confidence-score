@@ -9,7 +9,7 @@ import (
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
 
-	"github.com/google/go-github/v86/github"
+	"github.com/google/go-github/v87/github"
 	"golang.org/x/sync/errgroup"
 )
 
