@@ -1,0 +1,26 @@
+name: AI Evals
+
+on:
+  pull_request:
+    paths:
+      - 'docs/**'
+      - '.claude/**'
+      - 'CLAUDE.md'
+      - 'AGENTS.md'
+      - 'promptfoo.yaml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: promptfoo/promptfoo-action@cad6100f9d4d35f0a1d7aa036d2d8a8d223b483b # v1
+        with:
+          config: promptfoo.yaml
+          cache-path: ~/.cache/promptfoo
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ secrets.GOOGLE_APPLICATION_CREDENTIALS }}

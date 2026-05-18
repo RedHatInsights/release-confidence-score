@@ -1,6 +1,9 @@
-/.claude/
+/.claude/*
 !/.claude/rules/
-!/.claude/rules/**
+!/.claude/settings.json
+!/.claude/scripts/
+!/.claude/skills/
 /.idea/
 /.env
+/.promptfoo/
 /rcs

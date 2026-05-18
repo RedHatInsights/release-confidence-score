@@ -136,3 +136,23 @@ The codebase has minimal direct dependencies (see `go.mod`):
 
 No web frameworks, no assertion libraries, no code generation tools, no mocking libraries.
 
+### Friction Capture and Continuous Improvement
+
+This repo has an automatic friction capture system. At the end of every Claude Code session, a Stop hook analyzes the conversation transcript and writes friction events (corrections, clarifications, denials, mistakes) as individual markdown files to `.claude/friction/`.
+
+#### For contributors
+
+1. Run `git config core.hooksPath .githooks` once after cloning.
+2. Work normally. Friction is captured automatically.
+3. Before pushing, if friction files exist, run `/improve-docs`.
+4. The command proposes doc and eval improvements, opens a PR, and deletes the friction files.
+5. Push goes through. Team reviews the PR normally.
+
+#### Friction file format
+
+Each file in `.claude/friction/` has YAML frontmatter with `type`, `severity`, `slug`, `doc_gap`, `session`, and `date` fields, followed by a one-paragraph description.
+
+#### Evals
+
+Run evals locally with `promptfoo eval` after doc changes. CI runs evals automatically on PRs that touch docs or agent context files (`.github/workflows/evals.yml`).
+

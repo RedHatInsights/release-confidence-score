@@ -39,6 +39,21 @@ docker compose run --rm rcs --compare-links "https://github.com/org/repo/compare
 
 ### Environment Requirements
 - Go 1.25.0 or later
-- No pre-commit hooks configured
 - No linter configuration (follow Go standard formatting)
 - No vendoring (dependencies via `go mod download`)
+
+## Setup (once per clone)
+
+```bash
+git config core.hooksPath .githooks
+```
+
+To enable friction capture, add to `.claude/settings.local.json`:
+
+```json
+{
+  "env": {
+    "FRICTION_CAPTURE": "1"
+  }
+}
+```

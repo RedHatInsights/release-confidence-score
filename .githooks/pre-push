@@ -1,0 +1,11 @@
+#!/bin/bash
+# Reminds contributors to process friction files before they pile up.
+
+FRICTION_DIR=".claude/friction"
+COUNT=$(find "$FRICTION_DIR" -name "*.md" 2>/dev/null | wc -l)
+
+if [ "$COUNT" -ge 5 ]; then
+  echo "Warning: $COUNT friction files are waiting in .claude/friction/ — the docs will thank you for running /improve-docs soon!"
+elif [ "$COUNT" -gt 0 ]; then
+  echo "Note: $COUNT friction file(s) captured in .claude/friction/. Run /improve-docs whenever you're ready."
+fi

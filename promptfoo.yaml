@@ -1,0 +1,134 @@
+description: "RCS agent context evals"
+
+prompts:
+  - >
+    You are an AI coding agent working on the Release Confidence Score (RCS) project,
+    a Go application that analyzes release diffs from GitHub and GitLab and generates
+    confidence reports using LLM providers (Claude, Gemini) via GCP Vertex AI.
+
+    Follow the project guidelines below.
+
+    {% include "docs/security-guidelines.md" %}
+    {% include "docs/error-handling-guidelines.md" %}
+    {% include "docs/testing-guidelines.md" %}
+    {% include "docs/api-contracts-guidelines.md" %}
+    {% include "docs/performance-guidelines.md" %}
+    {% include "docs/integration-guidelines.md" %}
+
+providers:
+  - id: vertex:messages:claude-sonnet-4-6
+    config:
+      max_tokens: 4096
+
+tests:
+  # From security-guidelines.md: credential clearing
+  - description: "GCP service account key must be cleared after use"
+    vars:
+      task: >
+        Add a new LLM provider that uses GCP OAuth2 authentication.
+        Show how to initialize the credentials from the config's
+        GCPServiceAccountKey field.
+    assert:
+      - type: contains
+        value: "clear("
+      - type: llm-rubric
+        value: >
+          The code clears the GCP service account key bytes after
+          credential initialization using clear(), whether it succeeds
+          or fails. The key field is set to nil after clearing.
+
+  # From error-handling-guidelines.md: error wrapping
+  - description: "Errors use fmt.Errorf with %w and verb-first prefix"
+    vars:
+      task: >
+        Write error handling for a function that fetches repository
+        metadata from the GitHub SDK using the go-github client.
+    assert:
+      - type: contains
+        value: "fmt.Errorf"
+      - type: contains
+        value: "%w"
+      - type: not-contains
+        value: "log.Fatal"
+      - type: llm-rubric
+        value: >
+          Error messages use lowercase verb-first prefixes like
+          "failed to fetch" or "failed to get". Errors are returned
+          with fmt.Errorf and %w wrapping. Internal packages never
+          call log.Fatal or log.Fatalf.
+
+  # From testing-guidelines.md: table-driven tests
+  - description: "Tests use table-driven pattern with correct conventions"
+    vars:
+      task: >
+        Write a test for a function that parses GitHub compare URLs
+        and extracts the owner, repo, base ref, and head ref.
+    assert:
+      - type: contains
+        value: "tests := []struct"
+      - type: contains
+        value: "t.Run(tt.name"
+      - type: not-contains
+        value: "assert."
+      - type: llm-rubric
+        value: >
+          Uses table-driven test pattern with slice named "tests"
+          (not "testCases"), loop variable "tt", and t.Run for each
+          case. Uses standard testing package assertions (t.Errorf
+          or t.Fatalf), not testify or any assertion library.
+
+  # From api-contracts-guidelines.md: GitProvider interface
+  - description: "New git providers implement the GitProvider interface"
+    vars:
+      task: >
+        Add a new Bitbucket git provider that implements the
+        GitProvider interface for fetching release data from
+        Bitbucket compare URLs.
+    assert:
+      - type: contains
+        value: "IsCompareURL"
+      - type: contains
+        value: "FetchReleaseData"
+      - type: contains
+        value: "Name()"
+      - type: llm-rubric
+        value: >
+          The provider implements all three GitProvider methods:
+          IsCompareURL (URL detection via compiled regex),
+          FetchReleaseData (returns Comparison, UserGuidance,
+          and Documentation), and Name. FetchReleaseData returns
+          all data in one call, not separate methods.
+
+  # From performance-guidelines.md: errgroup with SetLimit
+  - description: "Concurrent API calls use errgroup with SetLimit(10)"
+    vars:
+      task: >
+        Write a function that enriches a list of commits with
+        pull request metadata by making one GitHub API call per
+        commit, running them concurrently.
+    assert:
+      - type: contains
+        value: "errgroup"
+      - type: contains
+        value: "SetLimit(10)"
+      - type: llm-rubric
+        value: >
+          Uses errgroup.WithContext for parallel API calls with
+          g.SetLimit(10) to cap concurrency. Uses gCtx (the
+          errgroup context) inside goroutines, not the parent ctx.
+
+  # From integration-guidelines.md: platform parity
+  - description: "GitHub changes must consider GitLab parity"
+    vars:
+      task: >
+        Add a new field 'releaseNotes' to the commit enrichment
+        in the GitHub provider's diff.go file that fetches release
+        notes associated with each commit's tag.
+    assert:
+      - type: llm-rubric
+        value: >
+          The response either implements the same change for the
+          GitLab provider or explicitly notes that the equivalent
+          change should be made in the GitLab package. Any new data
+          types are added to internal/git/types/ (platform-agnostic),
+          not as GitHub-specific fields.
