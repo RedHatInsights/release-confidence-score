@@ -5,6 +5,6 @@ import (
 	"release-confidence-score/internal/config"
 )
 
-func NewClient(cfg *config.Config) *github.Client {
-	return github.NewClient(nil).WithAuthToken(cfg.GitHubToken)
+func NewClient(cfg *config.Config) (*github.Client, error) {
+	return github.NewClient(github.WithAuthToken(cfg.GitHubToken))
 }

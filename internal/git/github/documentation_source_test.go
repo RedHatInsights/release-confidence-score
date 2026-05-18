@@ -7,7 +7,10 @@ import (
 )
 
 func TestNewDocumentationSource(t *testing.T) {
-	client := github.NewClient(nil)
+	client, err := github.NewClient()
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
 	owner := "test-owner"
 	repo := "test-repo"
 
@@ -25,9 +28,10 @@ func TestNewDocumentationSource(t *testing.T) {
 }
 
 func TestGetDefaultBranch_NilDefaultBranch(t *testing.T) {
-	// This test demonstrates the nil handling logic exists
-	// We can't easily test the GitHub API without mocking, but we can test the constructor
-	client := github.NewClient(nil)
+	client, err := github.NewClient()
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
 	source := newDocumentationSource(client, "owner", "repo")
 
 	if source == nil {
@@ -36,14 +40,15 @@ func TestGetDefaultBranch_NilDefaultBranch(t *testing.T) {
 }
 
 func TestFetchFileContent_Constructor(t *testing.T) {
-	// Test that the documentationSource is properly constructed
-	client := github.NewClient(nil)
+	client, err := github.NewClient()
+	if err != nil {
+		t.Fatalf("unexpected error creating client: %v", err)
+	}
 	owner := "test-owner"
 	repo := "test-repo"
 
 	source := newDocumentationSource(client, owner, repo)
 
-	// Verify fields are set (can't test actual API calls without complex mocking)
 	if source.owner != owner || source.repo != repo {
 		t.Error("documentationSource fields not set correctly")
 	}

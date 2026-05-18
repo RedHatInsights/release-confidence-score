@@ -38,7 +38,10 @@ type ReleaseAnalyzer struct {
 }
 
 func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
-	githubClient := github.NewClient(cfg)
+	githubClient, err := github.NewClient(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create GitHub client: %w", err)
+	}
 
 	gitlabClient, err := gitlab.NewClient(cfg)
 	if err != nil {
