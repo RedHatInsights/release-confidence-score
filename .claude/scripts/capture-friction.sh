@@ -70,24 +70,42 @@ INPUT=$(cat)
 
   TODAY=$(date +%Y-%m-%d)
 
-  # The transcript is JSONL. Extract text content from user and assistant turns.
-  # Turns are kept whole — truncating individual turns risks cutting the end of an
-  # assistant response or a user correction, which is exactly where friction lives.
-  # Instead, cap the total at 200K chars by dropping from the front: recent turns
-  # matter most for friction detection, and Haiku's context window is not a concern.
-  TRANSCRIPT=$(jq -r '
-  select(.type == "user" or .type == "assistant") |
-  "[" + .type + "]: " + (
-    if (.message.content | type) == "array"
-    then [.message.content[] | select(.type == "text") | .text] | join(" ")
-    else (.message.content // "")
-    end
-  )
-' "$TRANSCRIPT_PATH" 2>> "$LOG_FILE")
-  TRANSCRIPT="${TRANSCRIPT: -200000}"
+  # The transcript is a JSONL file where each line is one record. The first lines are
+  # metadata (permissionMode, snapshot) written at session start; user/assistant turns
+  # are appended throughout and may not be fully written when this hook fires.
+  #
+  # Poll until jq finds at least one user or assistant turn, or give up after 60 seconds.
+  # A jq parse error means the file is structurally invalid and won't recover — exit immediately.
+  #
+  # Each turn is extracted as "[user]: ..." or "[assistant]: ..." text. The total is
+  # capped at the last 200K bytes (tail -c) so recent turns — where friction lives —
+  # are always preserved. Per-turn truncation is intentionally avoided: cutting an
+  # assistant response or user correction mid-sentence would lose exactly the signal
+  # we're trying to capture.
+  WAIT=0
+  TRANSCRIPT=""
+  while [ $WAIT -lt 60 ]; do
+    TRANSCRIPT=$(jq -r '
+      select(.type == "user" or .type == "assistant") |
+      "[" + .type + "]: " + (
+        if (.message.content | type) == "array"
+        then [.message.content[] | select(.type == "text") | .text] | join(" ")
+        else (.message.content // "")
+        end
+      )
+    ' "$TRANSCRIPT_PATH" 2>> "$LOG_FILE" | tail -c 200000)
+    if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+      log "ERROR: Session $SHORT_SESSION: jq failed to parse transcript at $TRANSCRIPT_PATH"
+      exit 0
+    fi
+    [ -n "$TRANSCRIPT" ] && break
+    sleep 1
+    WAIT=$((WAIT + 1))
+  done
+  log "DEBUG: transcript ready after ${WAIT}s"
 
-  if [ $? -ne 0 ]; then
-    log "ERROR: Session $SHORT_SESSION: jq failed to parse transcript at $TRANSCRIPT_PATH"
+  if [ -z "$TRANSCRIPT" ]; then
+    log "ERROR: Session $SHORT_SESSION: no user/assistant turns found after 60s, skipping"
     exit 0
   fi
 

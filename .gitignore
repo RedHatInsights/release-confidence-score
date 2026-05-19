@@ -3,6 +3,7 @@
 !/.claude/settings.json
 !/.claude/scripts/
 !/.claude/skills/
+!/.claude/.friction-capture-version
 /.idea/
 /.env
 /.promptfoo/
