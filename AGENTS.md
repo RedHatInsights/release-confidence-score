@@ -97,6 +97,8 @@ Several files are embedded at compile time via `//go:embed`:
 
 Modifying these embedded files changes LLM behavior or report output. Test changes carefully.
 
+`docs/DEMO_CONFIDENCE_REPORT.md` is a rendered example of the report template output. When `internal/report/report_template.md` changes (new fields, section renames, format updates), update this file in the same commit.
+
 ### Two Operation Modes
 
 - **App-interface mode**: Reads a GitLab MR from the `service/app-interface` project, extracts diff URLs from a `devtools-bot` comment, fetches release data from those URLs, and optionally posts the report back to the MR.

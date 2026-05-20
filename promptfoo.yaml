@@ -117,6 +117,20 @@ tests:
           g.SetLimit(10) to cap concurrency. Uses gCtx (the
           errgroup context) inside goroutines, not the parent ctx.
 
+  # From AGENTS.md: demo file must stay in sync with report template
+  - description: "Report template changes must include update to docs/DEMO_CONFIDENCE_REPORT.md"
+    vars:
+      task: >
+        Add a new "Token Usage" section to the report output template
+        in internal/report/report_template.md that shows the number of
+        input and output tokens consumed by the LLM call.
+    assert:
+      - type: llm-rubric
+        value: >
+          The response mentions updating docs/DEMO_CONFIDENCE_REPORT.md
+          to reflect the new section, either by including the edit or
+          explicitly noting it must be updated in the same commit.
+
   # From integration-guidelines.md: platform parity
   - description: "GitHub changes must consider GitLab parity"
     vars:
