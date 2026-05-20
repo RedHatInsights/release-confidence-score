@@ -95,7 +95,7 @@ Several files are embedded at compile time via `//go:embed`:
 - `internal/report/report_template.md` -- Report output Go template
 - `internal/llm/truncation/truncation.go` embeds a JSON file for file risk classification
 
-Modifying these embedded files changes LLM behavior or report output. Test changes carefully.
+Modifying these embedded files changes LLM behavior or report output. Test changes carefully. When editing `report_template.md`, also update `docs/DEMO_CONFIDENCE_REPORT.md` to reflect the new output format.
 
 ### Two Operation Modes
 
