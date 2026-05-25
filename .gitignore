@@ -1,10 +1,18 @@
-/.claude/*
-!/.claude/rules/
-!/.claude/settings.json
-!/.claude/scripts/
-!/.claude/skills/
-!/.claude/.friction-capture-version
 /.idea/
 /.env
 /.promptfoo/
 /rcs
+
+# Ignore everything in .claude/ by default, then explicitly allow what should be committed.
+# This prevents local settings, worktrees, friction events, logs, and lock files from being accidentally committed.
+/.claude/*
+!/.claude/rules/
+
+# Shared Claude Code settings (hooks, permissions). Do NOT commit settings.local.json.
+!/.claude/settings.json
+# The capture script run by the SessionEnd hook.
+!/.claude/scripts/
+# Skills installed locally (e.g. /update-context-docs).
+!/.claude/skills/
+# Tracks which version of the friction capture toolkit is installed.
+!/.claude/.friction-capture-version
