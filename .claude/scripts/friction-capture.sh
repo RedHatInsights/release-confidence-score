@@ -1,15 +1,15 @@
 #!/bin/bash
-# Friction capture script — runs as a Claude Code SessionEnd hook.
+# SessionEnd hook — captures friction events at the end of each Claude Code session.
 #
 # At the end of every session, Claude Code invokes this script with a JSON payload
 # on stdin containing the transcript path. This script asks a small LLM (Haiku) to
 # scan the transcript for friction events (corrections, mistakes, clarifications,
-# denied tool calls) and writes one markdown file per event to .claude/friction/.
+# denied tool calls) and writes one markdown file per event to .claude/friction/{session-id}/.
 #
-# Those files are later processed by /improve-docs to propose doc improvements.
-# Enable with FRICTION_CAPTURE=1 in .claude/settings.local.json.
+# Those files are later processed by /update-context-docs to propose doc improvements.
+# Disable with FRICTION_CAPTURE=0 in .claude/settings.local.json.
 
-if [ "$FRICTION_CAPTURE" != "1" ]; then
+if [ "${FRICTION_CAPTURE:-1}" != "1" ]; then
   exit 0
 fi
 
@@ -69,6 +69,8 @@ INPUT=$(cat)
   log "DEBUG: transcript_path = $TRANSCRIPT_PATH"
 
   TODAY=$(date +%Y-%m-%d)
+  SESSION_DIR="$FRICTION_DIR/${SESSION_ID:-unkn}"
+  mkdir -p "$SESSION_DIR"
 
   # The transcript is a JSONL file where each line is one record. The first lines are
   # metadata (permissionMode, snapshot) written at session start; user/assistant turns
@@ -114,20 +116,36 @@ INPUT=$(cat)
     exit 0
   fi
 
-  PROMPT="Analyze this coding agent session for friction signals.
+  PROMPT="Analyze this coding agent session for friction signals worth capturing as documentation gaps.
 
-Friction = moments where the human corrected the agent, the agent asked a question
-it shouldn't have needed to ask, the agent made a wrong assumption, or a tool call
-was denied.
+Friction = a moment where the human corrected the agent, the agent asked a question it
+shouldn't have needed to ask, the agent made a wrong assumption, or a tool call was denied.
 
-For each friction event found, output a JSON array. Each element must have these fields:
+Before including an event, apply both filters:
+1. Would adding a concrete rule, example, or convention to a specific project doc have
+   prevented this in a future session?
+2. Would the same misunderstanding likely recur on a similar task — not just this specific case?
+If either answer is no, exclude the event.
+
+Exclude the following — they are noise:
+- User errors: the user made a mistake in their own request and corrected it themselves
+- Tool denials that are one-off decisions (e.g. 'not yet', 'use this file instead') — but DO
+  capture denials that reveal a standing project policy (e.g. 'we never run migrations directly')
+- Mid-session scope changes or preference pivots by the user
+- Transient or environmental errors (network issues, flaky tests, API timeouts)
+- Corrections to generated code that are case-specific and would not recur on similar tasks
+- Requirement clarifications that depend on context no project doc could have anticipated
+
+For each qualifying event, output a JSON array. Each element must have:
 - type: one of correction, clarification, denial, mistake
-- severity: one of low, medium, high
 - slug: short-kebab-case-description
-- doc_gap: path/to/guideline.md or none
-- description: one paragraph describing what went wrong and what the correct behavior should have been
+- doc_gap: path/to/target-file.md — the specific file where a rule should be added or clarified.
+  If you cannot name a specific plausible target file, exclude the event entirely.
+- description: one paragraph — what the agent did wrong, what project-specific knowledge was
+  missing, and the concrete rule or example that would prevent it from recurring. If you cannot
+  state that rule in one sentence, exclude the event.
 
-If no friction was found, output an empty array: []
+If no qualifying friction was found, output an empty array: []
 
 <transcript>
 $TRANSCRIPT
@@ -169,23 +187,19 @@ Output ONLY valid JSON. Do not use markdown formatting, code fences, or any othe
   log "INFO: found $EVENT_COUNT friction event(s)"
 
   # Write one markdown file per friction event with YAML frontmatter.
-  # The /improve-docs skill reads these files to propose documentation changes.
+  # The /update-context-docs skill reads these files to propose documentation changes.
   echo "$RESULT" | jq -c '.[]' | while read -r event; do
     SLUG=$(echo "$event" | jq -r '.slug // "unknown"')
     TYPE=$(echo "$event" | jq -r '.type')
-    SEVERITY=$(echo "$event" | jq -r '.severity')
     DOC_GAP=$(echo "$event" | jq -r '.doc_gap')
     DESC=$(echo "$event" | jq -r '.description')
 
-    FILENAME="${TODAY}-${SHORT_SESSION}-${SLUG}.md"
-    log "INFO: -> $FILENAME ($TYPE, $SEVERITY)"
-    cat > "$FRICTION_DIR/$FILENAME" <<EOF
+    FILENAME="${SLUG}.md"
+    log "INFO: -> $SESSION_ID/$FILENAME ($TYPE)"
+    cat > "$SESSION_DIR/$FILENAME" <<EOF
 ---
 type: $TYPE
-severity: $SEVERITY
-slug: $SLUG
 doc_gap: $DOC_GAP
-session: $SHORT_SESSION
 date: $TODAY
 ---
 

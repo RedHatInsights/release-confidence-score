@@ -1,12 +1,24 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/scripts/friction-reminder.sh",
+            "timeout": 2000
+          }
+        ]
+      }
+    ],
     "SessionEnd": [
       {
         "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/scripts/capture-friction.sh",
+            "command": "bash .claude/scripts/friction-capture.sh",
             "timeout": 5000
           }
         ]
