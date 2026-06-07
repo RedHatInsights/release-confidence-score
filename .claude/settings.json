@@ -1,4 +1,16 @@
 {
+  "enabledPlugins": {
+    "togi@togi": true
+  },
+  "extraKnownMarketplaces": {
+    "togi": {
+      "source": {
+        "source": "github",
+        "repo": "gwenneg/togi"
+      },
+      "autoUpdate": true
+    }
+  },
   "hooks": {
     "SessionStart": [
       {
@@ -6,7 +18,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/scripts/friction-reminder.sh",
+            "command": ".claude/bin/togi remind",
             "timeout": 2000
           }
         ]
@@ -18,7 +30,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/scripts/friction-capture.sh",
+            "command": ".claude/bin/togi capture",
             "timeout": 5000
           }
         ]

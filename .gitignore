@@ -19,3 +19,4 @@
 /.env
 /.promptfoo/
 /rcs
+!/.claude/bin/
