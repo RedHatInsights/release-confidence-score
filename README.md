@@ -228,3 +228,7 @@ These labels are included in the analysis to help assess test coverage and relea
 ### API Rate Limit Optimization
 
 RCS uses in-memory caching to minimize API calls to GitHub and GitLab. When analyzing a release, the same PR/MR objects are often needed for multiple operations (commit enrichment, QE label extraction, user guidance collection). Caching ensures each PR/MR is fetched only once per analysis run, reducing the risk of hitting API rate limits when analyzing releases with many commits.
+
+## AI friction capture (togi)
+
+This repo uses [togi](https://github.com/gwenneg/togi) to turn AI friction into context-doc improvements. Participation is opt-in per developer — see [adopt-togi.md](adopt-togi.md) for the setup commands.

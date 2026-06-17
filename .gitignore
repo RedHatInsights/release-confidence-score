@@ -6,3 +6,5 @@
 /.env
 /.promptfoo/
 /rcs
+/.claude/settings.local.json
+/.togi/
