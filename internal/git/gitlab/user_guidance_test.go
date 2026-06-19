@@ -88,7 +88,7 @@ func TestProcessNote(t *testing.T) {
 			name: "valid guidance from MR author",
 			note: &gitlab.Note{
 				ID:        1,
-				Body:      "/rcs This is important guidance",
+				Body:      "/rcs note This is important guidance",
 				Author:    gitlab.NoteAuthor{Username: "author"},
 				CreatedAt: &now,
 			},
@@ -101,7 +101,7 @@ func TestProcessNote(t *testing.T) {
 			name: "valid guidance from approver",
 			note: &gitlab.Note{
 				ID:        2,
-				Body:      "/rcs This is guidance from approver",
+				Body:      "/rcs note This is guidance from approver",
 				Author:    gitlab.NoteAuthor{Username: "approver1"},
 				CreatedAt: &now,
 			},
@@ -114,7 +114,7 @@ func TestProcessNote(t *testing.T) {
 			name: "guidance from unauthorized user",
 			note: &gitlab.Note{
 				ID:        3,
-				Body:      "/rcs This is unauthorized guidance",
+				Body:      "/rcs note This is unauthorized guidance",
 				Author:    gitlab.NoteAuthor{Username: "stranger"},
 				CreatedAt: &now,
 			},

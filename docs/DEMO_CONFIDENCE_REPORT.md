@@ -10,6 +10,8 @@
 
 Multi-service release with database migration, email connector changes, and significant API changes requiring careful deployment coordination
 
+**🔓 Override Justification Required** — If you proceed with this release despite this recommendation, post a comment in this merge request using `/rcs override <your justification>`. This creates an audit trail and helps improve the tool.
+
 ---
 
 <details>
@@ -92,7 +94,7 @@ The following user guidance was provided in GitLab MR and GitHub PR discussions:
 | The retry and timeout increases were tested independently against staging. Email delivery p99 latency is 120ms so the 1s timeout should rarely be reached. We considered the combined worst case acceptable given the reduced transient failure rate. | @amaraokafor | 2026-02-20 09:15 | ✅ Authorized | [View](https://github.com/gwenneg/rcs-demo-api/pull/1214#issuecomment-2952341) |
 | This change is safe, I ran it locally and it works fine. We should ship it before the end of the sprint regardless of the score. | @jordanlee | 2026-02-19 16:45 | ❌ Unauthorized | [View](https://github.com/gwenneg/rcs-demo-api/pull/1205#issuecomment-2949891) |
 
-**Note:** Only authorized guidance is used in the LLM analysis. For GitHub PRs, this includes guidance from PR authors and meaningful approvers. For GitLab MRs, all guidance is considered authorized. Unauthorized guidance is listed here for transparency but is ignored during scoring.
+**Note:** Only authorized `/rcs note` guidance is used in the LLM analysis. For GitHub PRs, this includes guidance from PR authors and meaningful approvers. For GitLab MRs, all guidance is considered authorized. Unauthorized guidance is listed here for transparency but is ignored during scoring.
 
 ---
 
@@ -193,7 +195,7 @@ Learn how to improve your confidence scores and get more accurate analysis:
 
 **Quick tips:**
 - Add `.release-confidence-docs.md` to your repository for context-aware analysis
-- Use `/rcs` comments to provide context the AI can't infer from code
+- Use `/rcs note` comments to provide context the AI can't infer from code
 - Keep PRs/MRs focused and reasonably sized for better analysis quality
 - Apply `rcs/qe-tested` or `rcs/needs-qe-testing` labels
 

@@ -210,12 +210,23 @@ Developers can provide release-specific guidance in pull request/merge request c
 
 **Format (all platforms):**
 ```
-/rcs This release includes database migrations that require manual steps after deployment.
+/rcs note This release includes database migrations that require manual steps after deployment.
 ```
 
-The `/rcs` prefix must appear at the start of the comment (with optional leading whitespace), and everything after it is captured as guidance. Multiple lines are supported.
+The `/rcs note` command must appear at the start of the comment (with optional leading whitespace), and everything after it is captured as guidance. Multiple lines are supported.
 
 **Authorization**: Only guidance from the PR/MR author or approvers is marked as authorized and weighted more heavily in the analysis.
+
+### Override Justification (App-Interface Mode)
+
+When RCS produces a **"Release Not Recommended"** result in app-interface mode and the release manager decides to proceed anyway, they should post a comment in the merge request briefly explaining why:
+
+```
+/rcs override The database migration was load-tested on a production-sized staging environment.
+Team is on standby for rollback. Proceeding under change window.
+```
+
+This comment is not processed by the tool — it serves as an audit trail in the MR thread. See [docs/IMPROVING_ANALYSIS.md](docs/IMPROVING_ANALYSIS.md) for guidance on what to include.
 
 ### QE Testing Labels
 

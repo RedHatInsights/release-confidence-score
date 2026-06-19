@@ -45,10 +45,10 @@ See [`.release-confidence-docs.example.md`](../.release-confidence-docs.example.
 
 **Impact: High** | **Effort: Low** | **Per-PR/MR**
 
-Add `/rcs` comments in your pull request or merge request to provide context the AI can't infer from code alone:
+Add `/rcs note` comments in your pull request or merge request to provide context the AI can't infer from code alone:
 
 ```
-/rcs This change updates the rate limiting logic. The new limits have been
+/rcs note This change updates the rate limiting logic. The new limits have been
 load tested and approved by the platform team. No database changes required.
 ```
 
@@ -245,13 +245,13 @@ The tool classifies files by risk level for truncation decisions:
 ### "My score is lower than expected"
 
 **Checklist:**
-- [ ] Did you add `/rcs` guidance explaining the changes?
+- [ ] Did you add `/rcs note` guidance explaining the changes?
 - [ ] Is repository documentation present and current?
 - [ ] Are commit messages descriptive?
 - [ ] Did you apply QE testing labels?
 - [ ] Is the PR/MR focused on one concern?
 
-**Quick fix:** Add a `/rcs` comment explaining why changes are safe.
+**Quick fix:** Add a `/rcs note` comment explaining why changes are safe.
 
 ---
 
@@ -276,7 +276,7 @@ Include:
 3. Mixed with higher-risk changes
 
 **Solutions:**
-- Add `/rcs` guidance: `/rcs These config files are test fixtures, not production configuration`
+- Add `/rcs note` guidance: `/rcs note These config files are test fixtures, not production configuration`
 - Separate low-risk changes into their own PR/MR
 - Update repository documentation to clarify
 
@@ -285,8 +285,8 @@ Include:
 ### "Large refactoring PR/MR"
 
 **Best practices:**
-1. Add detailed `/rcs` guidance explaining the scope
-2. Confirm behavior is unchanged: `/rcs Pure refactoring, no behavior changes. All tests pass.`
+1. Add detailed `/rcs note` guidance explaining the scope
+2. Confirm behavior is unchanged: `/rcs note Pure refactoring, no behavior changes. All tests pass.`
 3. Reference test results or QE validation
 4. Consider breaking into smaller incremental changes
 
@@ -297,7 +297,7 @@ Include:
 ### Before Submitting
 
 - [ ] Repository has `.release-confidence-docs.md`
-- [ ] Added `/rcs` guidance with relevant context
+- [ ] Added `/rcs note` guidance with relevant context
 - [ ] Commit messages explain "why" not just "what"
 - [ ] Applied QE testing labels if applicable
 - [ ] PR/MR is focused on a single concern
@@ -308,8 +308,38 @@ Include:
 - [ ] Review all action items, especially "Critical"
 - [ ] Understand identified risk factors
 - [ ] Address documentation recommendations
-- [ ] Add clarifying `/rcs` guidance if AI missed context
+- [ ] Add clarifying `/rcs note` guidance if AI missed context
 - [ ] Re-run analysis if significant context was added
+- [ ] If proceeding despite a "Not Recommended" result, post an `/rcs override` comment in the MR with your justification (see below)
+
+---
+
+## Overriding a "Not Recommended" Recommendation
+
+> **Note:** This section applies to **app-interface mode** only, where the report is posted to a GitLab merge request. In standalone mode, there is no associated MR/PR to post the justification to.
+
+When RCS produces a **"Release Not Recommended"** result and you decide to proceed anyway, post a comment in the merge request using `/rcs override <your justification>`.
+
+**Examples:**
+
+```
+/rcs override The database migration was load-tested on a production-sized staging environment.
+Index creation completed in under 60 seconds with no lock contention. Team is on standby for rollback.
+```
+
+```
+/rcs override All critical action items addressed — deployment split into two phases per the report
+recommendation. The remaining concerns are informational only and will be monitored post-release.
+```
+
+**What makes a good justification:**
+- Explains why the specific concerns raised are acceptable or already mitigated
+- References testing, staging results, or on-call coverage if relevant
+- Notes any action items that were resolved before proceeding
+
+**Why this matters:** The justification is recorded in the PR/MR thread, creating an audit trail. It also surfaces false positives that can be used to improve the tool — if RCS flagged something that turned out to be safe, reporting it helps calibrate future analyses.
+
+To report a false positive or false negative, open an issue at the [project repository](https://github.com/RedHatInsights/release-confidence-score/issues).
 
 ---
 
@@ -336,7 +366,7 @@ Include:
 
 ### The Analysis Seems Wrong
 
-1. **Add context via `/rcs`** - The AI works with available information
+1. **Add context via `/rcs note`** - The AI works with available information
 2. **Update documentation** - Ensure `.release-confidence-docs.md` reflects reality
 3. **Check truncation** - Large diffs may have relevant code truncated
 4. **Review action items** - Sometimes the AI catches real issues
