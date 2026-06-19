@@ -360,6 +360,7 @@ func TestAnalyze_SuccessFirstTry(t *testing.T) {
 		[]*types.Comparison{},
 		[]types.UserGuidance{},
 		[]*types.Documentation{},
+		false,
 	)
 
 	if err != nil {
@@ -394,6 +395,7 @@ func TestAnalyze_RetriesOnContextWindowError(t *testing.T) {
 		[]*types.Comparison{},
 		[]types.UserGuidance{},
 		[]*types.Documentation{},
+		false,
 	)
 
 	if err != nil {
@@ -421,6 +423,7 @@ func TestAnalyze_FailsOnNonContextError(t *testing.T) {
 		[]*types.Comparison{},
 		[]types.UserGuidance{},
 		[]*types.Documentation{},
+		false,
 	)
 
 	if err == nil {
@@ -448,6 +451,7 @@ func TestAnalyze_ExhaustsAllTruncationLevels(t *testing.T) {
 		[]*types.Comparison{},
 		[]types.UserGuidance{},
 		[]*types.Documentation{},
+		false,
 	)
 
 	if err == nil {
@@ -476,6 +480,7 @@ func TestAnalyze_FailsDuringTruncationRetry(t *testing.T) {
 		[]*types.Comparison{},
 		[]types.UserGuidance{},
 		[]*types.Documentation{},
+		false,
 	)
 
 	if err == nil {

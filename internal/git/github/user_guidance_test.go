@@ -186,7 +186,7 @@ func TestProcessComment(t *testing.T) {
 	}{
 		{
 			name:           "valid guidance from PR author",
-			body:           "/rcs This is important guidance",
+			body:           "/rcs note This is important guidance",
 			author:         prAuthor,
 			expectGuidance: true,
 			expectError:    false,

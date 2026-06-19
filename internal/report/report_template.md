@@ -10,6 +10,12 @@
 
 {{.Analysis.Summary}}
 
+{{- if and .AppInterfaceMode (contains .ReleaseRecommendation "NOT RECOMMENDED")}}
+
+**🔓 Override Justification Required** — If you proceed with this release despite this recommendation, post a comment in this merge request using `/rcs override <your justification>`. This creates an audit trail and helps improve the tool.
+
+{{- end}}
+
 ---
 
 {{- if .TruncationInfo}}
@@ -115,7 +121,7 @@ The following user guidance was provided in GitLab MR and GitHub PR discussions:
 | {{.Content}} | {{formatAuthor .Author .CommentURL}} | {{formatDate .Date}} | {{authorizationStatus .IsAuthorized}} | [View]({{.CommentURL}}) |
 {{- end}}
 
-**Note:** Only authorized guidance is used in the LLM analysis. For GitHub PRs, this includes guidance from PR authors and meaningful approvers. For GitLab MRs, all guidance is considered authorized. Unauthorized guidance is listed here for transparency but is ignored during scoring.
+**Note:** Only authorized `/rcs note` guidance is used in the LLM analysis. For GitHub PRs, this includes guidance from PR authors and meaningful approvers. For GitLab MRs, all guidance is considered authorized. Unauthorized guidance is listed here for transparency but is ignored during scoring.
 {{- end}}
 
 ---
@@ -226,7 +232,7 @@ Learn how to improve your confidence scores and get more accurate analysis:
 
 **Quick tips:**
 - Add `.release-confidence-docs.md` to your repository for context-aware analysis
-- Use `/rcs` comments to provide context the AI can't infer from code
+- Use `/rcs note` comments to provide context the AI can't infer from code
 - Keep PRs/MRs focused and reasonably sized for better analysis quality
 - Apply `rcs/qe-tested` or `rcs/needs-qe-testing` labels
 

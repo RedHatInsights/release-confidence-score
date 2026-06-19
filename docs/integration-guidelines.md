@@ -96,6 +96,6 @@ Blob-to-raw URL conversion (`shared/documentation_fetcher.go`):
 | Logic | Location | Why shared |
 |---|---|---|
 | QE label extraction | `shared/qe_labels.go` | Same label names on both platforms |
-| User guidance parsing (`/rcs` prefix) | `shared/user_guidance_parser.go` | Same format on both platforms |
+| User guidance parsing (`/rcs note` command) | `shared/user_guidance_parser.go` | Same format on both platforms |
 | Documentation fetching | `shared/documentation_fetcher.go` | Same `.release-confidence-docs.md` entry point |
 | External URL fetching | `shared/external_url_fetcher.go` | GitLab auth/SSL logic needed by both platforms |

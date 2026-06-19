@@ -97,7 +97,7 @@ func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int64, postToMR b
 	// Merge user guidance from app-interface MR and Git sources
 	allGuidance := append(appInterfaceGuidance, gitGuidance...)
 
-	score, reportText, err := ra.analyze(comparisons, allGuidance, documentation)
+	score, reportText, err := ra.analyze(comparisons, allGuidance, documentation, true)
 	if err != nil {
 		return 0, "", err
 	}
@@ -127,7 +127,7 @@ func (ra *ReleaseAnalyzer) AnalyzeStandalone(compareURLs []string) (float64, str
 		return 0, "", err
 	}
 
-	return ra.analyze(comparisons, gitGuidance, documentation)
+	return ra.analyze(comparisons, gitGuidance, documentation, false)
 }
 
 // getReleaseData fetches raw release data from multiple compare URLs (GitHub or GitLab)
@@ -213,7 +213,7 @@ func (ra *ReleaseAnalyzer) getReleaseData(urls []string) ([]*types.Comparison, [
 }
 
 // analyze formats data, calls the LLM (with progressive truncation if needed), and generates the report
-func (ra *ReleaseAnalyzer) analyze(comparisons []*types.Comparison, userGuidance []types.UserGuidance, documentation []*types.Documentation) (float64, string, error) {
+func (ra *ReleaseAnalyzer) analyze(comparisons []*types.Comparison, userGuidance []types.UserGuidance, documentation []*types.Documentation, appInterfaceMode bool) (float64, string, error) {
 	// Format data and prepare initial prompt
 	diffContent := formatting.FormatComparisons(comparisons)
 	documentationText := formatting.FormatDocumentations(documentation)
@@ -258,6 +258,7 @@ func (ra *ReleaseAnalyzer) analyze(comparisons []*types.Comparison, userGuidance
 		TruncationInfo:          truncationInfo,
 		AutoDeployThreshold:     ra.config.ScoreThresholds.AutoDeploy,
 		ReviewRequiredThreshold: ra.config.ScoreThresholds.ReviewRequired,
+		AppInterfaceMode:        appInterfaceMode,
 	}
 
 	score, finalReport, err := report.GenerateReport(reportConfig)

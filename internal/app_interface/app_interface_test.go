@@ -187,7 +187,7 @@ func TestExtractUserGuidance(t *testing.T) {
 				{
 					ID:        1,
 					Author:    gitlabapi.NoteAuthor{Username: "alice"},
-					Body:      "/rcs please review carefully",
+					Body:      "/rcs note please review carefully",
 					CreatedAt: &createdAt,
 				},
 			},
@@ -207,13 +207,13 @@ func TestExtractUserGuidance(t *testing.T) {
 				{
 					ID:        1,
 					Author:    gitlabapi.NoteAuthor{Username: "alice"},
-					Body:      "/rcs first guidance",
+					Body:      "/rcs note first guidance",
 					CreatedAt: &createdAt,
 				},
 				{
 					ID:        2,
 					Author:    gitlabapi.NoteAuthor{Username: "bob"},
-					Body:      "/rcs second guidance",
+					Body:      "/rcs note second guidance",
 					CreatedAt: &createdAt,
 				},
 			},
@@ -246,7 +246,7 @@ func TestExtractUserGuidance(t *testing.T) {
 				{
 					ID:        2,
 					Author:    gitlabapi.NoteAuthor{Username: "bob"},
-					Body:      "/rcs important guidance",
+					Body:      "/rcs note important guidance",
 					CreatedAt: &createdAt,
 				},
 				{
@@ -272,7 +272,7 @@ func TestExtractUserGuidance(t *testing.T) {
 				{
 					ID:        1,
 					Author:    gitlabapi.NoteAuthor{Username: "alice"},
-					Body:      "/rcs line 1\nline 2\nline 3",
+					Body:      "/rcs note line 1\nline 2\nline 3",
 					CreatedAt: &createdAt,
 				},
 			},
@@ -304,13 +304,13 @@ func TestExtractUserGuidance(t *testing.T) {
 				{
 					ID:        1,
 					Author:    gitlabapi.NoteAuthor{Username: "alice"},
-					Body:      "/rcs should be skipped",
+					Body:      "/rcs note should be skipped",
 					CreatedAt: nil,
 				},
 				{
 					ID:        2,
 					Author:    gitlabapi.NoteAuthor{Username: "bob"},
-					Body:      "/rcs should be included",
+					Body:      "/rcs note should be included",
 					CreatedAt: &createdAt,
 				},
 			},

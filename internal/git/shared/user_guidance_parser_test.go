@@ -13,26 +13,38 @@ func TestParseUserGuidance(t *testing.T) {
 	}{
 		{
 			name:          "simple guidance",
-			input:         "/rcs this is a guidance message",
+			input:         "/rcs note this is a guidance message",
 			expectedText:  "this is a guidance message",
 			expectedFound: true,
 		},
 		{
 			name:          "case insensitive",
-			input:         "/RCS This Is A Message",
+			input:         "/RCS NOTE This Is A Message",
 			expectedText:  "This Is A Message",
 			expectedFound: true,
 		},
 		{
 			name:          "multiline guidance",
-			input:         "/rcs first line\nsecond line\nthird line",
+			input:         "/rcs note first line\nsecond line\nthird line",
 			expectedText:  "first line\nsecond line\nthird line",
 			expectedFound: true,
 		},
 		{
 			name:          "with extra whitespace",
-			input:         "  /rcs   guidance with spaces   ",
+			input:         "  /rcs   note   guidance with spaces   ",
 			expectedText:  "guidance with spaces",
+			expectedFound: true,
+		},
+		{
+			name:          "leading tabs should work",
+			input:         "\t\t/rcs note guidance with tabs",
+			expectedText:  "guidance with tabs",
+			expectedFound: true,
+		},
+		{
+			name:          "captures everything after subcommand",
+			input:         "/rcs note first\nmore content\n/rcs note second",
+			expectedText:  "first\nmore content\n/rcs note second",
 			expectedFound: true,
 		},
 		{
@@ -48,34 +60,40 @@ func TestParseUserGuidance(t *testing.T) {
 			expectedFound: false,
 		},
 		{
+			name:          "bare /rcs no longer matches",
+			input:         "/rcs this is guidance",
+			expectedText:  "",
+			expectedFound: false,
+		},
+		{
 			name:          "rcs without space",
-			input:         "/rcsno space",
+			input:         "/rcsnote content",
 			expectedText:  "",
 			expectedFound: false,
 		},
 		{
-			name:          "rcs with only whitespace",
-			input:         "/rcs   ",
+			name:          "rcs note with only whitespace content",
+			input:         "/rcs note   ",
 			expectedText:  "",
 			expectedFound: false,
 		},
 		{
-			name:          "mixed case rcs",
-			input:         "/RcS mixed case guidance",
-			expectedText:  "mixed case guidance",
-			expectedFound: true,
-		},
-		{
-			name:          "text before rcs should not match",
-			input:         "Before\n/rcs important guidance\nAfter",
+			name:          "text before /rcs note should not match",
+			input:         "Before\n/rcs note important guidance\nAfter",
 			expectedText:  "",
 			expectedFound: false,
 		},
 		{
-			name:          "captures everything after first /rcs",
-			input:         "/rcs first\nmore content\n/rcs second",
-			expectedText:  "first\nmore content\n/rcs second",
-			expectedFound: true,
+			name:          "non-whitespace before /rcs note should not match",
+			input:         "Some text /rcs note this should not match",
+			expectedText:  "",
+			expectedFound: false,
+		},
+		{
+			name:          "inline /rcs note should not match",
+			input:         "Please note: /rcs note this is important",
+			expectedText:  "",
+			expectedFound: false,
 		},
 	}
 
@@ -84,11 +102,11 @@ func TestParseUserGuidance(t *testing.T) {
 			text, found := ParseUserGuidance(tt.input)
 
 			if found != tt.expectedFound {
-				t.Errorf("Expected found=%v, got %v", tt.expectedFound, found)
+				t.Errorf("found = %v, want %v", found, tt.expectedFound)
 			}
 
 			if text != tt.expectedText {
-				t.Errorf("Expected text '%s', got '%s'", tt.expectedText, text)
+				t.Errorf("text = %q, want %q", text, tt.expectedText)
 			}
 		})
 	}
@@ -103,43 +121,43 @@ func TestParseUserGuidanceEdgeCases(t *testing.T) {
 	}{
 		{
 			name:          "guidance with special characters",
-			input:         "/rcs Check the @deployment: it uses env vars!",
+			input:         "/rcs note Check the @deployment: it uses env vars!",
 			expectedText:  "Check the @deployment: it uses env vars!",
 			expectedFound: true,
 		},
 		{
 			name:          "guidance with URLs",
-			input:         "/rcs See https://example.com for details",
+			input:         "/rcs note See https://example.com for details",
 			expectedText:  "See https://example.com for details",
 			expectedFound: true,
 		},
 		{
-			name:          "text before /rcs should not match",
-			input:         "Line 1\nLine 2\n/rcs guidance here\nLine 3",
+			name:          "text before /rcs note should not match",
+			input:         "Line 1\nLine 2\n/rcs note guidance here\nLine 3",
 			expectedText:  "",
 			expectedFound: false,
 		},
 		{
-			name:          "multiple spaces after rcs",
-			input:         "/rcs     multiple     spaces",
+			name:          "multiple spaces after note subcommand",
+			input:         "/rcs note     multiple     spaces",
 			expectedText:  "multiple     spaces",
 			expectedFound: true,
 		},
 		{
-			name:          "leading tabs should work",
-			input:         "\t\t/rcs guidance with tabs",
-			expectedText:  "guidance with tabs",
-			expectedFound: true,
-		},
-		{
-			name:          "non-whitespace before /rcs should not match",
-			input:         "Some text /rcs this should not match",
+			name:          "non-whitespace before /rcs note should not match",
+			input:         "Some text /rcs note this should not match",
 			expectedText:  "",
 			expectedFound: false,
 		},
 		{
-			name:          "inline /rcs should not match",
-			input:         "Please note: /rcs this is important",
+			name:          "inline /rcs note should not match",
+			input:         "Please note: /rcs note this is important",
+			expectedText:  "",
+			expectedFound: false,
+		},
+		{
+			name:          "/rcs override does not match note pattern",
+			input:         "/rcs override proceeding with justification",
 			expectedText:  "",
 			expectedFound: false,
 		},
@@ -150,11 +168,11 @@ func TestParseUserGuidanceEdgeCases(t *testing.T) {
 			text, found := ParseUserGuidance(tt.input)
 
 			if found != tt.expectedFound {
-				t.Errorf("Expected found=%v, got %v", tt.expectedFound, found)
+				t.Errorf("found = %v, want %v", found, tt.expectedFound)
 			}
 
 			if text != tt.expectedText {
-				t.Errorf("Expected text '%s', got '%s'", tt.expectedText, text)
+				t.Errorf("text = %q, want %q", text, tt.expectedText)
 			}
 		})
 	}
