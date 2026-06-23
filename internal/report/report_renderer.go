@@ -191,6 +191,7 @@ type ReportConfig struct {
 	AutoDeployThreshold     int
 	ReviewRequiredThreshold int
 	AppInterfaceMode        bool
+	FeedbackURL             string
 }
 
 // TemplateData holds all data needed for template rendering
@@ -203,6 +204,7 @@ type TemplateData struct {
 	AllUserGuidance       []types.UserGuidance           // All user guidance for comprehensive reporting
 	TruncationInfo        *truncation.TruncationMetadata // Optional truncation information
 	AppInterfaceMode      bool
+	FeedbackURL           string
 }
 
 // GenerateReport parses LLM response and generates the final report
@@ -234,6 +236,7 @@ func GenerateReport(config *ReportConfig) (score int, report string, err error) 
 		AllUserGuidance:       config.UserGuidance,
 		TruncationInfo:        config.TruncationInfo,
 		AppInterfaceMode:      config.AppInterfaceMode,
+		FeedbackURL:           config.FeedbackURL,
 	}
 
 	// Execute pre-compiled template

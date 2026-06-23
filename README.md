@@ -165,6 +165,9 @@ For Gemini:
 - `RCS_SCORE_THRESHOLD_AUTO_DEPLOY`: Minimum score for auto-deployment recommendation (default: 80).
 - `RCS_SCORE_THRESHOLD_REVIEW_REQUIRED`: Minimum score before manual review required (default: 60).
 
+**Feedback:**
+- `RCS_FEEDBACK_URL`: URL of the feedback form to display at the bottom of reports posted in app-interface mode. Leave unset to omit the feedback link.
+
 See `.env.example` for a complete configuration template.
 
 ## How RCS Works
@@ -227,6 +230,22 @@ Team is on standby for rollback. Proceeding under change window.
 ```
 
 This comment is not processed by the tool — it serves as an audit trail in the MR thread. See [docs/IMPROVING_ANALYSIS.md](docs/IMPROVING_ANALYSIS.md) for guidance on what to include.
+
+### User Feedback
+
+When `RCS_FEEDBACK_URL` is set, RCS embeds a link to a feedback form at the bottom of reports posted to app-interface MRs. The form is used to evaluate the accuracy, reliability, and business value of the tool over time.
+
+The form collects the minimum information needed to assess RCS quality:
+
+| Question | Type | Purpose |
+|----------|------|---------|
+| App-interface MR URL | Text | Links response to a specific analysis |
+| How did RCS perform? | Grid (5-point agreement scale) | Score accuracy, risk accuracy, action item relevance, decision influence, time saved |
+| How useful was each section? | Grid (Essential / Helpful / Not helpful / N/A) | Per-section usefulness across Summary, Risk Analysis, Action Items, Technical Details, Changelogs, Release Documentation, User Guidance |
+| I would recommend RCS to other teams | Multiple choice (Definitely / Yes, with some improvements / No) | Overall satisfaction |
+| Anything else? | Optional free text | Qualitative input |
+
+The form does not collect names, email addresses, or any other personally identifiable information. Access to form responses is restricted to team members with a justified business need.
 
 ### QE Testing Labels
 

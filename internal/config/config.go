@@ -16,6 +16,7 @@ var (
 )
 
 type Config struct {
+	FeedbackURL            string
 	GCPServiceAccountKey []byte // cleared after credential initialization
 	GitHubToken          string
 	GitLabBaseURL          string
@@ -40,6 +41,9 @@ type ScoreThresholds struct {
 
 // Load creates a new Config instance from environment variables and validates it
 func Load(isAppInterfaceMode bool) (*Config, error) {
+
+	// Parse feedback configuration
+	feedbackURL := os.Getenv("RCS_FEEDBACK_URL")
 
 	// Parse Git platform configuration
 	gitHubToken := os.Getenv("RCS_GITHUB_TOKEN")
@@ -96,6 +100,7 @@ func Load(isAppInterfaceMode bool) (*Config, error) {
 
 	// Build config struct
 	cfg := &Config{
+		FeedbackURL:            feedbackURL,
 		GCPServiceAccountKey:   gcpSAKey,
 		GitHubToken:            gitHubToken,
 		GitLabBaseURL:          gitLabBaseURL,

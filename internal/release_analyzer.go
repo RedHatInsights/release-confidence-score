@@ -259,6 +259,7 @@ func (ra *ReleaseAnalyzer) analyze(comparisons []*types.Comparison, userGuidance
 		AutoDeployThreshold:     ra.config.ScoreThresholds.AutoDeploy,
 		ReviewRequiredThreshold: ra.config.ScoreThresholds.ReviewRequired,
 		AppInterfaceMode:        appInterfaceMode,
+		FeedbackURL:             ra.config.FeedbackURL,
 	}
 
 	score, finalReport, err := report.GenerateReport(reportConfig)
