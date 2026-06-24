@@ -174,7 +174,7 @@ See `.env.example` for a complete configuration template.
 
 ![How RCS Works](./how-rcs-works.svg)
 
-[Diagram Source](https://excalidraw.com/#json=cvrkECd6KAJU1Ssf3C6g6,NoH6zq-snRCX6CzEEiBidQ)
+[Diagram Source](https://excalidraw.com/#json=eEtbgAlaneyGDCW_Q68ac,zpK9S5BkAYNU86erOqEyxQ)
 
 ### App-Interface Mode
 1. **App-Interface Data Collection**: Fetches merge request details from GitLab app-interface repository, including diff URLs and user guidance from merge request comments.
