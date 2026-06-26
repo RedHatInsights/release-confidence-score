@@ -170,6 +170,28 @@ For Gemini:
 
 See `.env.example` for a complete configuration template.
 
+## Logging
+
+RCS writes structured logs to stdout (see [Logging Configuration](#optional-environment-variables) for format and level options). The following lifecycle entries are produced at the default log level (`info`) for every run:
+
+| Event | Key fields |
+|---|---|
+| Run started | `mode`, `mr_iid` (app-interface) or `compare_urls` (standalone) |
+| LLM call | `provider`, `model_id` |
+| Analysis complete | `score` |
+| Report posted | `mr_iid` (only with `--post-to-mr`) |
+
+Example output with `RCS_LOG_FORMAT=json`:
+
+```json
+{"level":"INFO","msg":"Starting release analysis","mode":"app-interface","mr_iid":42}
+{"level":"INFO","msg":"Calling LLM","provider":"claude","model_id":"claude-sonnet-4-6"}
+{"level":"INFO","msg":"Analysis complete","score":87}
+{"level":"INFO","msg":"Report posted to merge request","mr_iid":42}
+```
+
+Centralization and immutability of logs are the responsibility of the execution environment (e.g., the CI pipeline that runs RCS).
+
 ## How RCS Works
 
 ![How RCS Works](./how-rcs-works.svg)

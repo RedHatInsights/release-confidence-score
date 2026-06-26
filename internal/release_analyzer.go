@@ -74,7 +74,7 @@ func New(cfg *config.Config) (*ReleaseAnalyzer, error) {
 }
 
 func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int64, postToMR bool) (float64, string, error) {
-	slog.Debug("Starting release analysis in app-interface mode")
+	slog.Info("Starting release analysis", "mode", "app-interface", "mr_iid", mergeRequestIID)
 
 	// Create GitLab client for app-interface API calls
 	gitlabClient, err := gitlab.NewClient(ra.config)
@@ -115,7 +115,7 @@ func (ra *ReleaseAnalyzer) AnalyzeAppInterface(mergeRequestIID int64, postToMR b
 
 // AnalyzeStandalone performs release analysis using compare URLs directly (standalone mode)
 func (ra *ReleaseAnalyzer) AnalyzeStandalone(compareURLs []string) (float64, string, error) {
-	slog.Debug("Starting release analysis in standalone mode", "url_count", len(compareURLs))
+	slog.Info("Starting release analysis", "mode", "standalone", "compare_urls", compareURLs)
 
 	if len(compareURLs) == 0 {
 		return 0, "", fmt.Errorf("no compare URLs provided")
@@ -224,6 +224,7 @@ func (ra *ReleaseAnalyzer) analyze(comparisons []*types.Comparison, userGuidance
 	}
 
 	// Try LLM analysis with full content first
+	slog.Info("Calling LLM", "provider", ra.config.ModelProvider, "model_id", ra.config.ModelID)
 	response, err := ra.llmClient.Analyze(userPrompt)
 	var truncationInfo *truncation.TruncationMetadata
 
@@ -267,6 +268,7 @@ func (ra *ReleaseAnalyzer) analyze(comparisons []*types.Comparison, userGuidance
 		return 0, "", fmt.Errorf("failed to generate report: %w", err)
 	}
 
+	slog.Info("Analysis complete", "score", score)
 	return float64(score), finalReport, nil
 }
 
