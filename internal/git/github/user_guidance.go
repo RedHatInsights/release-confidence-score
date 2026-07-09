@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/go-github/v88/github"
+	"github.com/google/go-github/v89/github"
 	"golang.org/x/sync/errgroup"
 	"release-confidence-score/internal/git/shared"
 	"release-confidence-score/internal/git/types"
