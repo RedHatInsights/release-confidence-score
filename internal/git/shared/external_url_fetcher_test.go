@@ -83,41 +83,41 @@ func TestFetchExternalURL_GitLabAuthentication(t *testing.T) {
 	_ = receivedHeader // Avoid unused variable warning
 }
 
-func TestIsGitLabURL_GitLabCom(t *testing.T) {
+func TestIsGitLabURL(t *testing.T) {
 	tests := []struct {
-		url      string
-		expected bool
+		name       string
+		url        string
+		gitlabBase string
+		expected   bool
 	}{
-		{"https://gitlab.com/user/repo", true},
-		{"https://www.gitlab.com/user/repo", true},
-		{"https://gitlab.example.com/user/repo", true},
-		{"https://github.com/user/repo", false},
-		{"https://example.com/user/repo", false},
-		{"https://my-gitlab-server.com/user/repo", false}, // doesn't start with "gitlab."
+		{"configured instance matches", "https://gitlab.corp.example.com/user/repo", "https://gitlab.corp.example.com", true},
+		{"configured instance with path in base", "https://gitlab.corp.example.com/user/repo", "https://gitlab.corp.example.com/api/v4", true},
+		{"case insensitive match", "https://GitLab.Corp.Example.COM/user/repo", "https://gitlab.corp.example.com", true},
+		{"attacker-controlled gitlab prefix", "https://gitlab.evil.example/doc.md", "https://gitlab.corp.example.com", false},
+		{"no base URL configured", "https://gitlab.com/user/repo", "", false},
+		{"github.com", "https://github.com/user/repo", "https://gitlab.corp.example.com", false},
+		{"random domain", "https://example.com/user/repo", "https://gitlab.corp.example.com", false},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.url, func(t *testing.T) {
-			result := isGitLabURL(tt.url)
+		t.Run(tt.name, func(t *testing.T) {
+			result := isGitLabURL(tt.url, tt.gitlabBase)
 			if result != tt.expected {
-				t.Errorf("isGitLabURL(%s) = %v, expected %v", tt.url, result, tt.expected)
+				t.Errorf("isGitLabURL(%s, %s) = %v, expected %v", tt.url, tt.gitlabBase, result, tt.expected)
 			}
 		})
 	}
 }
 
 func TestIsGitLabURL_InvalidURL(t *testing.T) {
-	// Test with invalid URL - url.Parse is very permissive, so let's test actual malformed cases
-	// Most strings parse as relative URLs, so we test the hostname checking instead
 	invalidURL := "://invalid-url-with-gitlab"
-	result := isGitLabURL(invalidURL)
-	// Should fall back to string matching
-	if !result {
-		t.Error("expected true for malformed URL containing 'gitlab'")
+	result := isGitLabURL(invalidURL, "")
+	if result {
+		t.Error("expected false for malformed URL — must not fall back to string matching")
 	}
 
 	noGitLab := "://invalid-url"
-	result = isGitLabURL(noGitLab)
+	result = isGitLabURL(noGitLab, "")
 	if result {
 		t.Error("expected false for malformed URL not containing 'gitlab'")
 	}
