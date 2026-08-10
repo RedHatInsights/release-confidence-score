@@ -1,0 +1,35 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "github>konflux-ci/mintmaker//config/renovate/renovate.json"
+  ],
+  "baseBranchPatterns": [
+    "main"
+  ],
+  // Raise fix PRs for vulnerabilities found in GitHub's advisory database (needs Dependabot alerts enabled on the repo).
+  "vulnerabilityAlerts": {
+    "enabled": true
+  },
+  // Raise fix PRs for vulnerabilities found in OSV.dev. Its coverage differs from GitHub's, so we need both.
+  "osvVulnerabilityAlerts": true,
+  "tekton": {
+    "automerge": true,
+    "schedule": ["at any time"]
+  },
+  "packageRules": [
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch", "minor"],
+      // Delay before automerging, to reduce the risk of merging a compromised release (supply-chain attacks are often caught and pulled within days of publishing).
+      "minimumReleaseAge": "3 days",
+      "automerge": true
+    },
+    {
+      "matchManagers": ["gomod"],
+      "matchUpdateTypes": ["patch", "minor"],
+      // Delay before automerging, to reduce the risk of merging a compromised release (supply-chain attacks are often caught and pulled within days of publishing).
+      "minimumReleaseAge": "3 days",
+      "automerge": true
+    }
+  ]
+}
