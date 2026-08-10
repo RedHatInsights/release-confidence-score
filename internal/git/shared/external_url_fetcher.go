@@ -20,12 +20,20 @@ const maxResponseBodySize = 1 << 20
 // fetchExternalURL fetches content from an external URL
 func (d *DocumentationFetcher) fetchExternalURL(ctx context.Context, urlStr string) (string, error) {
 	// Determine if this is a GitLab URL for SSL verification settings
-	isGitLab := isGitLabURL(urlStr, d.config.GitLabBaseURL)
+	gitlabHost := gitlabHostname(d.config.GitLabBaseURL)
+	isGitLab := isGitLabURL(urlStr, gitlabHost)
 	skipSSLVerify := isGitLab && d.config.GitLabSkipSSLVerify
 
 	httpClient := httputil.NewHTTPClient(httputil.HTTPClientOptions{
-		Timeout:       httpTimeout,
-		SkipSSLVerify: skipSSLVerify,
+		Timeout:         httpTimeout,
+		SkipSSLVerify:   skipSSLVerify,
+		BlockPrivateIPs: true,
+		// The configured GitLab instance is a trusted destination that may
+		// legitimately live on a private IP; anything else comes from
+		// repo-controlled content and must not reach internal infrastructure.
+		// This is checked per dial, so a redirect away from GitLab to another
+		// private host is still blocked.
+		AllowedPrivateHost: gitlabHost,
 	})
 
 	req, err := http.NewRequestWithContext(ctx, "GET", urlStr, nil)
@@ -61,10 +69,11 @@ func (d *DocumentationFetcher) fetchExternalURL(ctx context.Context, urlStr stri
 	return string(body), nil
 }
 
-// isGitLabURL checks if a URL's host exactly matches the configured GitLab instance.
-// Only exact hostname matches are accepted to prevent token leakage to attacker-controlled hosts.
-func isGitLabURL(urlStr, gitlabBaseURL string) bool {
-	if gitlabBaseURL == "" {
+// isGitLabURL checks if a URL's host exactly matches gitlabHost (as returned
+// by gitlabHostname). Only exact hostname matches are accepted to prevent
+// token leakage to attacker-controlled hosts.
+func isGitLabURL(urlStr, gitlabHost string) bool {
+	if gitlabHost == "" {
 		return false
 	}
 
@@ -73,10 +82,16 @@ func isGitLabURL(urlStr, gitlabBaseURL string) bool {
 		return false
 	}
 
+	return strings.ToLower(parsedURL.Hostname()) == gitlabHost
+}
+
+// gitlabHostname returns the lowercase hostname of the configured GitLab
+// instance, or "" if unset or unparsable.
+func gitlabHostname(gitlabBaseURL string) string {
 	parsedBaseURL, err := url.Parse(gitlabBaseURL)
 	if err != nil || parsedBaseURL.Hostname() == "" {
-		return false
+		return ""
 	}
 
-	return strings.ToLower(parsedURL.Hostname()) == strings.ToLower(parsedBaseURL.Hostname())
+	return strings.ToLower(parsedBaseURL.Hostname())
 }
