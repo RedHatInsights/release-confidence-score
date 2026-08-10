@@ -17,7 +17,7 @@ const httpTimeout = 30 * time.Second
 // fetchExternalURL fetches content from an external URL
 func (d *DocumentationFetcher) fetchExternalURL(ctx context.Context, urlStr string) (string, error) {
 	// Determine if this is a GitLab URL for SSL verification settings
-	isGitLab := isGitLabURL(urlStr)
+	isGitLab := isGitLabURL(urlStr, d.config.GitLabBaseURL)
 	skipSSLVerify := isGitLab && d.config.GitLabSkipSSLVerify
 
 	httpClient := httputil.NewHTTPClient(httputil.HTTPClientOptions{
@@ -53,17 +53,22 @@ func (d *DocumentationFetcher) fetchExternalURL(ctx context.Context, urlStr stri
 	return string(body), nil
 }
 
-// isGitLabURL checks if a URL is a GitLab URL by parsing and examining the hostname
-func isGitLabURL(urlStr string) bool {
-	parsedURL, err := url.Parse(urlStr)
-	if err != nil {
-		// Fallback to simple string matching if parsing fails
-		return strings.Contains(urlStr, "gitlab")
+// isGitLabURL checks if a URL's host exactly matches the configured GitLab instance.
+// Only exact hostname matches are accepted to prevent token leakage to attacker-controlled hosts.
+func isGitLabURL(urlStr, gitlabBaseURL string) bool {
+	if gitlabBaseURL == "" {
+		return false
 	}
 
-	hostname := strings.ToLower(parsedURL.Hostname())
-	// Check for gitlab.com or self-hosted GitLab instances (gitlab.*)
-	return hostname == "gitlab.com" ||
-		hostname == "www.gitlab.com" ||
-		strings.HasPrefix(hostname, "gitlab.")
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil || parsedURL.Hostname() == "" {
+		return false
+	}
+
+	parsedBaseURL, err := url.Parse(gitlabBaseURL)
+	if err != nil || parsedBaseURL.Hostname() == "" {
+		return false
+	}
+
+	return strings.ToLower(parsedURL.Hostname()) == strings.ToLower(parsedBaseURL.Hostname())
 }
