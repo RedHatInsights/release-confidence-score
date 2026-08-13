@@ -3,7 +3,7 @@ package github
 import (
 	"testing"
 
-	"github.com/google/go-github/v89/github"
+	"github.com/google/go-github/v90/github"
 )
 
 func TestExtractQELabel(t *testing.T) {
@@ -26,7 +26,7 @@ func TestExtractQELabel(t *testing.T) {
 			name: "qe-tested label",
 			pr: &github.PullRequest{
 				Labels: []*github.Label{
-					{Name: github.Ptr("rcs/qe-tested")},
+					{Name: "rcs/qe-tested"},
 				},
 			},
 			expected: "rcs/qe-tested",
@@ -35,7 +35,7 @@ func TestExtractQELabel(t *testing.T) {
 			name: "needs-qe-testing label",
 			pr: &github.PullRequest{
 				Labels: []*github.Label{
-					{Name: github.Ptr("rcs/needs-qe-testing")},
+					{Name: "rcs/needs-qe-testing"},
 				},
 			},
 			expected: "rcs/needs-qe-testing",
@@ -44,8 +44,8 @@ func TestExtractQELabel(t *testing.T) {
 			name: "both labels - qe-tested wins",
 			pr: &github.PullRequest{
 				Labels: []*github.Label{
-					{Name: github.Ptr("rcs/needs-qe-testing")},
-					{Name: github.Ptr("rcs/qe-tested")},
+					{Name: "rcs/needs-qe-testing"},
+					{Name: "rcs/qe-tested"},
 				},
 			},
 			expected: "rcs/qe-tested",
@@ -54,8 +54,8 @@ func TestExtractQELabel(t *testing.T) {
 			name: "unrelated labels",
 			pr: &github.PullRequest{
 				Labels: []*github.Label{
-					{Name: github.Ptr("bug")},
-					{Name: github.Ptr("enhancement")},
+					{Name: "bug"},
+					{Name: "enhancement"},
 				},
 			},
 			expected: "",
