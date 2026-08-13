@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"release-confidence-score/internal/config"
@@ -81,6 +82,30 @@ func TestFetchExternalURL_GitLabAuthentication(t *testing.T) {
 	// Note: This won't actually trigger GitLab auth because the test server URL
 	// doesn't match gitlab.com. We test the logic in isGitLabURL separately.
 	_ = receivedHeader // Avoid unused variable warning
+}
+
+func TestFetchExternalURL_ResponseBodyTooLarge(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		// Write more than maxResponseBodySize (1 MiB)
+		buf := make([]byte, maxResponseBodySize+1)
+		w.Write(buf)
+	}))
+	defer server.Close()
+
+	source := &mockDocumentationSource{}
+	repo := types.Repository{}
+	cfg := &config.Config{}
+	fetcher := NewDocumentationFetcher(source, repo, cfg)
+
+	_, err := fetcher.fetchExternalURL(context.Background(), server.URL)
+
+	if err == nil {
+		t.Fatal("expected error for oversized response body")
+	}
+	if !strings.Contains(err.Error(), "exceeds 1 MiB limit") {
+		t.Errorf("expected error about exceeding limit, got: %v", err)
+	}
 }
 
 func TestIsGitLabURL(t *testing.T) {

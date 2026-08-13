@@ -14,6 +14,9 @@ import (
 
 const httpTimeout = 30 * time.Second
 
+// maxResponseBodySize caps the amount of data read from external URLs (1 MiB).
+const maxResponseBodySize = 1 << 20
+
 // fetchExternalURL fetches content from an external URL
 func (d *DocumentationFetcher) fetchExternalURL(ctx context.Context, urlStr string) (string, error) {
 	// Determine if this is a GitLab URL for SSL verification settings
@@ -45,9 +48,14 @@ func (d *DocumentationFetcher) fetchExternalURL(ctx context.Context, urlStr stri
 		return "", fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	limitedReader := io.LimitReader(resp.Body, maxResponseBodySize+1)
+	body, err := io.ReadAll(limitedReader)
 	if err != nil {
 		return "", fmt.Errorf("failed to read response: %w", err)
+	}
+
+	if len(body) > maxResponseBodySize {
+		return "", fmt.Errorf("response body exceeds %d MiB limit", maxResponseBodySize>>20)
 	}
 
 	return string(body), nil
