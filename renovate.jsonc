@@ -17,7 +17,9 @@
   "packageRules": [
     {
       "matchManagers": ["github-actions"],
-      "matchUpdateTypes": ["digest"],
+      // Excludes digest-only updates, so a hijacked tag re-pointed to a malicious commit
+      // with no version delta never gets automerged.
+      "matchUpdateTypes": ["patch", "minor"],
       // Actions vetted for automerge. Add new ones deliberately.
       "matchDepNames": ["actions/checkout", "actions/setup-go"],
       // Delay before automerging, to reduce the risk of merging a compromised release (supply-chain attacks are often caught and pulled within days of publishing).
