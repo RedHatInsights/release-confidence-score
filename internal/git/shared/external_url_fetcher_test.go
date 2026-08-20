@@ -2,6 +2,7 @@ package shared
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -21,7 +22,11 @@ func TestFetchExternalURL_Success(t *testing.T) {
 
 	source := &mockDocumentationSource{}
 	repo := types.Repository{}
-	cfg := &config.Config{}
+	// GitLabBaseURL matches the test server so it's treated as the trusted
+	// configured instance, bypassing the private-IP SSRF guard (the server
+	// listens on loopback). SSRF blocking itself is covered by
+	// TestFetchExternalURL_BlocksPrivateIPForUntrustedHost below.
+	cfg := &config.Config{GitLabBaseURL: server.URL}
 	fetcher := NewDocumentationFetcher(source, repo, cfg)
 
 	content, err := fetcher.fetchExternalURL(context.Background(), server.URL)
@@ -43,7 +48,7 @@ func TestFetchExternalURL_NotFound(t *testing.T) {
 
 	source := &mockDocumentationSource{}
 	repo := types.Repository{}
-	cfg := &config.Config{}
+	cfg := &config.Config{GitLabBaseURL: server.URL}
 	fetcher := NewDocumentationFetcher(source, repo, cfg)
 
 	_, err := fetcher.fetchExternalURL(context.Background(), server.URL)
@@ -66,22 +71,83 @@ func TestFetchExternalURL_GitLabAuthentication(t *testing.T) {
 	source := &mockDocumentationSource{}
 	repo := types.Repository{}
 	cfg := &config.Config{
-		GitLabToken: "test-token-123",
+		GitLabToken:   "test-token-123",
+		GitLabBaseURL: server.URL, // matches the fetched host, so it's treated as the configured GitLab instance
 	}
 	fetcher := NewDocumentationFetcher(source, repo, cfg)
 
-	// Use gitlab.com URL to trigger GitLab auth
-	gitlabURL := server.URL + "/gitlab-path"
-	// Need to mock this as GitLab URL - let's just test with the server URL
-	// and manually verify token would be set
-	_, err := fetcher.fetchExternalURL(context.Background(), gitlabURL)
+	_, err := fetcher.fetchExternalURL(context.Background(), server.URL)
 
 	if err != nil {
 		t.Fatalf("expected no error, got: %v", err)
 	}
-	// Note: This won't actually trigger GitLab auth because the test server URL
-	// doesn't match gitlab.com. We test the logic in isGitLabURL separately.
-	_ = receivedHeader // Avoid unused variable warning
+	if receivedHeader != "test-token-123" {
+		t.Errorf("expected PRIVATE-TOKEN header %q, got: %q", "test-token-123", receivedHeader)
+	}
+}
+
+func TestFetchExternalURL_BlocksPrivateIPForUntrustedHost(t *testing.T) {
+	// Create a test server (listens on loopback, a private/non-public address)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("should never be returned"))
+	}))
+	defer server.Close()
+
+	source := &mockDocumentationSource{}
+	repo := types.Repository{}
+	// No GitLabBaseURL configured (or one that doesn't match), so the target
+	// is treated as untrusted repo-controlled content and must be blocked.
+	cfg := &config.Config{}
+	fetcher := NewDocumentationFetcher(source, repo, cfg)
+
+	_, err := fetcher.fetchExternalURL(context.Background(), server.URL)
+
+	if err == nil {
+		t.Fatal("expected error when fetching an untrusted URL that resolves to a private address")
+	}
+	if !strings.Contains(err.Error(), "blocked") {
+		t.Errorf("expected error about blocked private address, got: %v", err)
+	}
+}
+
+func TestFetchExternalURL_BlocksRedirectFromTrustedHostToPrivateTarget(t *testing.T) {
+	// Simulates a compromised/open-redirect response from the trusted GitLab
+	// host pointing at a different private-only target. The redirect must
+	// still be blocked even though the original request went to a trusted host.
+	internalTarget := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("internal secret"))
+	}))
+	defer internalTarget.Close()
+
+	// Use "localhost" so the redirect target is a distinct literal hostname
+	// from the trusted GitLab server's "127.0.0.1", even though both resolve
+	// to loopback.
+	_, port, err := net.SplitHostPort(strings.TrimPrefix(internalTarget.URL, "http://"))
+	if err != nil {
+		t.Fatalf("failed to split internal target address: %v", err)
+	}
+	redirectTarget := "http://localhost:" + port
+
+	gitlabServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, redirectTarget, http.StatusFound)
+	}))
+	defer gitlabServer.Close()
+
+	source := &mockDocumentationSource{}
+	repo := types.Repository{}
+	cfg := &config.Config{GitLabBaseURL: gitlabServer.URL}
+	fetcher := NewDocumentationFetcher(source, repo, cfg)
+
+	_, err = fetcher.fetchExternalURL(context.Background(), gitlabServer.URL)
+
+	if err == nil {
+		t.Fatal("expected redirect from trusted host to a non-trusted private target to be blocked")
+	}
+	if !strings.Contains(err.Error(), "blocked") {
+		t.Errorf("expected error mentioning blocked address, got: %v", err)
+	}
 }
 
 func TestFetchExternalURL_ResponseBodyTooLarge(t *testing.T) {
@@ -95,7 +161,11 @@ func TestFetchExternalURL_ResponseBodyTooLarge(t *testing.T) {
 
 	source := &mockDocumentationSource{}
 	repo := types.Repository{}
-	cfg := &config.Config{}
+	// GitLabBaseURL matches the test server so it's treated as the trusted
+	// configured instance, bypassing the private-IP SSRF guard (the server
+	// listens on loopback). SSRF blocking itself is covered by
+	// TestFetchExternalURL_BlocksPrivateIPForUntrustedHost above.
+	cfg := &config.Config{GitLabBaseURL: server.URL}
 	fetcher := NewDocumentationFetcher(source, repo, cfg)
 
 	_, err := fetcher.fetchExternalURL(context.Background(), server.URL)
@@ -112,23 +182,22 @@ func TestIsGitLabURL(t *testing.T) {
 	tests := []struct {
 		name       string
 		url        string
-		gitlabBase string
+		gitlabHost string
 		expected   bool
 	}{
-		{"configured instance matches", "https://gitlab.corp.example.com/user/repo", "https://gitlab.corp.example.com", true},
-		{"configured instance with path in base", "https://gitlab.corp.example.com/user/repo", "https://gitlab.corp.example.com/api/v4", true},
-		{"case insensitive match", "https://GitLab.Corp.Example.COM/user/repo", "https://gitlab.corp.example.com", true},
-		{"attacker-controlled gitlab prefix", "https://gitlab.evil.example/doc.md", "https://gitlab.corp.example.com", false},
-		{"no base URL configured", "https://gitlab.com/user/repo", "", false},
-		{"github.com", "https://github.com/user/repo", "https://gitlab.corp.example.com", false},
-		{"random domain", "https://example.com/user/repo", "https://gitlab.corp.example.com", false},
+		{"configured instance matches", "https://gitlab.corp.example.com/user/repo", "gitlab.corp.example.com", true},
+		{"case insensitive match", "https://GitLab.Corp.Example.COM/user/repo", "gitlab.corp.example.com", true},
+		{"attacker-controlled gitlab prefix", "https://gitlab.evil.example/doc.md", "gitlab.corp.example.com", false},
+		{"no host configured", "https://gitlab.com/user/repo", "", false},
+		{"github.com", "https://github.com/user/repo", "gitlab.corp.example.com", false},
+		{"random domain", "https://example.com/user/repo", "gitlab.corp.example.com", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := isGitLabURL(tt.url, tt.gitlabBase)
+			result := isGitLabURL(tt.url, tt.gitlabHost)
 			if result != tt.expected {
-				t.Errorf("isGitLabURL(%s, %s) = %v, expected %v", tt.url, tt.gitlabBase, result, tt.expected)
+				t.Errorf("isGitLabURL(%s, %s) = %v, expected %v", tt.url, tt.gitlabHost, result, tt.expected)
 			}
 		})
 	}
@@ -148,6 +217,29 @@ func TestIsGitLabURL_InvalidURL(t *testing.T) {
 	}
 }
 
+func TestGitlabHostname(t *testing.T) {
+	tests := []struct {
+		name       string
+		gitlabBase string
+		expected   string
+	}{
+		{"plain host", "https://gitlab.corp.example.com", "gitlab.corp.example.com"},
+		{"path in base is ignored", "https://gitlab.corp.example.com/api/v4", "gitlab.corp.example.com"},
+		{"case is normalized", "https://GitLab.Corp.Example.COM", "gitlab.corp.example.com"},
+		{"empty base", "", ""},
+		{"malformed base", "://invalid-url", ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := gitlabHostname(tt.gitlabBase)
+			if result != tt.expected {
+				t.Errorf("gitlabHostname(%s) = %q, expected %q", tt.gitlabBase, result, tt.expected)
+			}
+		})
+	}
+}
+
 func TestFetchAdditionalDocContent_ExternalHTTPURL(t *testing.T) {
 	// Create a test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -158,7 +250,7 @@ func TestFetchAdditionalDocContent_ExternalHTTPURL(t *testing.T) {
 
 	source := &mockDocumentationSource{}
 	repo := types.Repository{}
-	cfg := &config.Config{}
+	cfg := &config.Config{GitLabBaseURL: server.URL}
 	fetcher := NewDocumentationFetcher(source, repo, cfg)
 
 	content, err := fetcher.fetchAdditionalDocContent(context.Background(), "main", server.URL)
@@ -182,7 +274,7 @@ func TestFetchAdditionalDocContent_ExternalHTTPSURL(t *testing.T) {
 
 	source := &mockDocumentationSource{}
 	repo := types.Repository{}
-	cfg := &config.Config{}
+	cfg := &config.Config{GitLabBaseURL: server.URL}
 	fetcher := NewDocumentationFetcher(source, repo, cfg)
 
 	// Test with HTTPS URL prefix detection (using HTTP server for simplicity)
@@ -210,7 +302,7 @@ func TestFetchAdditionalDocContent_BlobURLConversion(t *testing.T) {
 
 	source := &mockDocumentationSource{}
 	repo := types.Repository{}
-	cfg := &config.Config{}
+	cfg := &config.Config{GitLabBaseURL: server.URL}
 	fetcher := NewDocumentationFetcher(source, repo, cfg)
 
 	blobURL := server.URL + "/blob/main/file.md"
