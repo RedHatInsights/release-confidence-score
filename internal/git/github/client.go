@@ -1,7 +1,7 @@
 package github
 
 import (
-	"github.com/google/go-github/v90/github"
+	"github.com/google/go-github/v91/github"
 	"release-confidence-score/internal/config"
 )
 

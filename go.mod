@@ -1,9 +1,9 @@
 module release-confidence-score
 
-go 1.25.0
+go 1.26.0
 
 require (
-	github.com/google/go-github/v90 v90.0.0
+	github.com/google/go-github/v91 v91.0.0
 	gitlab.com/gitlab-org/api/client-go/v2 v2.63.0
 	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.22.0
