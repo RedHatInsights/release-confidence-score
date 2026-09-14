@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	gitlabapi "gitlab.com/gitlab-org/api/client-go/v2"
+	gitlabapi "gitlab.com/gitlab-org/api/client-go/v3"
 )
 
 func TestExtractDiffURLsFromBot(t *testing.T) {
