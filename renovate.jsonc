@@ -1,9 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
-    "github>konflux-ci/mintmaker//config/renovate/renovate.json",
-    // Automerges updates that fix a vulnerability alert with HIGH, CRITICAL or UNKNOWN severity.
-    "github>konflux-ci/mintmaker-presets:cve-automerge-high"
+    "github>konflux-ci/mintmaker//config/renovate/renovate.json"
   ],
   "baseBranchPatterns": [
     "main"
@@ -22,24 +20,15 @@
       "matchUpdateTypes": ["patch", "minor"],
       // Actions vetted for automerge. Add new ones deliberately.
       "matchDepNames": ["actions/checkout", "actions/setup-go"],
-      // Delay before automerging, to reduce the risk of merging a compromised release (supply-chain attacks are often caught and pulled within days of publishing).
-      "minimumReleaseAge": "3 days",
+      // No minimumReleaseAge here: MintMaker's base config already enforces a delay before automerging, to reduce the risk of merging a compromised release.
       "automerge": true
     },
     {
       "matchManagers": ["gomod"],
       // Major bumps always need manual review, so they're excluded here.
       "matchUpdateTypes": ["patch", "minor"],
-      // Delay before automerging, to reduce the risk of merging a compromised release (supply-chain attacks are often caught and pulled within days of publishing).
-      "minimumReleaseAge": "3 days",
+      // No minimumReleaseAge here: MintMaker's base config already enforces a delay before automerging, to reduce the risk of merging a compromised release.
       "automerge": true
-    },
-    {
-      // Skip the delay before automerging for high/critical severity CVE fixes (automerge itself comes from the cve-automerge-high preset), so security patches land as soon as CI passes.
-      "matchJsonata": [
-        "$exists(isVulnerabilityAlert) and isVulnerabilityAlert = true and vulnerabilitySeverity in ['UNKNOWN', 'CRITICAL', 'HIGH']"
-      ],
-      "minimumReleaseAge": "0 seconds"
     }
   ]
 }
