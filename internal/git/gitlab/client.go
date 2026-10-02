@@ -1,7 +1,7 @@
 package gitlab
 
 import (
-	"gitlab.com/gitlab-org/api/client-go/v2"
+	"gitlab.com/gitlab-org/api/client-go/v3"
 	"release-confidence-score/internal/config"
 	httputil "release-confidence-score/internal/http"
 )
