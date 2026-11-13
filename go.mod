@@ -6,7 +6,7 @@ require (
 	github.com/google/go-github/v92 v92.0.0
 	gitlab.com/gitlab-org/api/client-go/v3 v3.44.0
 	golang.org/x/oauth2 v0.38.0
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 )
 
 require (
