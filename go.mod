@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/google/go-github/v92 v92.0.0
-	gitlab.com/gitlab-org/api/client-go/v3 v3.53.0
+	gitlab.com/gitlab-org/api/client-go/v3 v3.54.1
 	golang.org/x/oauth2 v0.38.0
 	golang.org/x/sync v0.25.0
 )
